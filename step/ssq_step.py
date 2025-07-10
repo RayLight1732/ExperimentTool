@@ -161,7 +161,8 @@ class SSQStep(Step):
         processor: SSQImageProcessor,
         saver: SSQDataSaver,
     ):
-        super().__init__(container, set_complete)
+        self.container = container
+        self.set_complete = set_complete
         self.queue = queue
         self.image = None
         self.after_id = None

@@ -74,12 +74,10 @@ class InitialStepUI:
 class InitialStep(Step):
     def __init__(
         self,
-        container: ttk.Frame,
         ui: InitialStepUI,
         set_complete: Callable[[bool], None],
         save_value: Callable[[str, int], None],
     ):
-        super().__init__(container, set_complete)
         self.set_complete = set_complete
         self.save_value = save_value
         self.ui = ui

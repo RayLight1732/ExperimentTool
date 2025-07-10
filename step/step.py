@@ -7,9 +7,6 @@ from abc import ABC, abstractmethod
 # Step 基底クラス
 # ---------------------
 class Step(ABC):
-    def __init__(self, container: ttk.Frame, set_complete: Callable[[bool], None]):
-        self.container = container
-        self.set_complete = set_complete
 
     @abstractmethod
     def build(self):

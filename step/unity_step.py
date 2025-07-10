@@ -187,13 +187,10 @@ class UnityStepController:
 class UnityStep(Step):
     def __init__(
         self,
-        container: ttk.Frame,
         set_complete: Callable[[bool], None],
         step_ui: UnityStepUI,
         controller: UnityStepController,
     ):
-        super().__init__(container, set_complete)
-
         self.ui = step_ui
         self.controller = controller
         self.set_complete = set_complete
@@ -248,5 +245,4 @@ class UnityStepFactory:
         unity_client = TCPClient(decoder)
         arduino_client = ArduinoSerial(port="COM3")
         controller = UnityStepController(unity_client, arduino_client, condition)
-        print(type(frame))
-        return UnityStep(frame, set_complete, ui, controller)
+        return UnityStep(set_complete, ui, controller)
