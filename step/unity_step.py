@@ -7,7 +7,7 @@ from network.data.string_data import STRING_DATA_TYPE, StringDataDecoder, String
 from network.tcp_client import TCPClient
 from network.data.data_decoder import DecodedData
 from network.simple_serial import ArduinoSerial
-
+import step.util as sutil
 
 class UnityStep(Step):
     def __init__(
@@ -62,26 +62,6 @@ class UnityStep(Step):
         )
         self.start_button.pack(side="top")
 
-        self.high_low_test_button = ttk.Button(
-            master=self.container,
-            text="ToHigh",
-            command=self._on_high_low_test_button_pressed,
-        )
-        self.high_low_test_button.pack(side="top")
-        self.to_high = True
-
-    def _on_high_low_test_button_pressed(self):
-        if self.arduino_client.connected:
-
-            if self.to_high:
-                self.arduino_client.send("high")
-                new_text = "ToLow"
-            else:
-                self.arduino_client.send("low")
-                new_text = "ToHigh"
-
-            self.high_low_test_button["text"] = new_text
-            self.to_high = not self.to_high
 
     # TODO 非同期にする
     def try_connect_unity(self):
@@ -120,7 +100,7 @@ class UnityStep(Step):
         self.start_button.config(state=state)
 
     def on_start_button_pressed(self):
-        self.unity_client.send_data(StringData("start"))
+        self.arduino_client.send("start")
         self.start_button.destroy()
 
     def on_dispose(self):
@@ -131,6 +111,8 @@ class UnityStep(Step):
         pass
 
     def _on_remote_start(self):
+        self.arduino_client.send(f"mode{self.condition}")
+        self.arduino_client.send("start")
         if self.started_text is None:
             self.started_text = tk.Label(self.container, text="実験中")
             self.started_text.pack(pady=20)
@@ -144,7 +126,7 @@ class UnityStep(Step):
             elif message == "started":
                 self._on_remote_start()
             elif message == "high":
-                self.arduino_client.send(f"high{self.condition}\n")
+                self.arduino_client.send("high")
             elif message == "low":
                 self.arduino_client.send("low\n")
         else:
@@ -154,6 +136,7 @@ class UnityStep(Step):
         print(f"receive:{msg}")
 
     def _on_end(self):
+        self.arduino_client.send("end")
         self.started_text.destroy()
         tk.Label(self.container, text="終了しました").pack(pady=20)
         self.set_complete(True)
