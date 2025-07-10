@@ -74,7 +74,7 @@ class SSQStepUI:
                     variable=var,
                     style="NoFocus.TRadiobutton",
                     command=on_radio_update,
-                ).grid(row=row, column=col + 1, sticky="w", padx=5, pady=2)
+                ).grid(row=row, column=col + 1, sticky="w", padx=5, pady=5)
 
     def update_canvas(self, pil_image: Optional[Image.Image]):
         self.canvas.delete("all")
