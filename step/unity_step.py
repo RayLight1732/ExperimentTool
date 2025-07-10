@@ -13,19 +13,40 @@ class UnityStepUI:
     def __init__(self, container: ttk.Frame):
         self.container = container
         self.ip_entry = None
+        self.port_entry = None
         self.connect_button = None
         self.arduino_connect_button = None
         self.start_button = None
         self.started_text = None
 
     def build(self, on_connect_unity, on_connect_arduino, on_start):
-        ttk.Label(self.container, text="ipアドレス").pack(side="top")
-        self.ip_entry = ttk.Entry(self.container)
-        self.ip_entry.insert(0, "127.0.0.1")
+        ttk.Label(self.container, text="IPアドレス").pack(side="top")
+
+        self.ip_var = tk.StringVar()
+        self.ip_var.trace_add("write", self._validate_ip_port)
+        self.ip_entry = ttk.Entry(self.container, textvariable=self.ip_var)
+
         self.ip_entry.pack(pady=(0, 10), side="top")
 
+        # port: 数字のみを許可する validatecommand の設定
+        ttk.Label(self.container, text="ポート番号").pack(side="top")
+        vcmd = (self.container.register(self._validate_port_entry), "%P")
+
+        self.port_var = tk.StringVar()
+        self.port_var.trace_add("write", self._validate_ip_port)
+        self.port_entry = ttk.Entry(
+            self.container,
+            textvariable=self.port_var,
+            validate="key",
+            validatecommand=vcmd,
+        )
+        self.port_entry.pack(pady=(0, 10), side="top")
+
         self.connect_button = ttk.Button(
-            self.container, text="Unityに接続", command=on_connect_unity
+            self.container,
+            text="Unityに接続",
+            command=on_connect_unity,
+            state="disabled",
         )
         self.connect_button.pack(side="top")
 
@@ -39,8 +60,25 @@ class UnityStepUI:
         )
         self.start_button.pack(side="top")
 
+        self.ip_entry.insert(0, "127.0.0.1")
+        self.port_entry.insert(0, "51234")
+
+    def _validate_port_entry(self, new_value):
+        return new_value == "" or new_value.isdigit()
+
+    def _validate_ip_port(self, *args):
+        ip = self.ip_var.get().strip()
+        port = self.port_var.get().strip()
+        if ip and port:
+            self.connect_button["state"] = "normal"
+        else:
+            self.connect_button["state"] = "disabled"
+
     def get_ip(self):
-        return self.ip_entry.get()
+        return self.ip_var.get()
+
+    def get_port(self):
+        return int(self.port_var.get()) if self.port_var.get().isdigit() else None
 
     def set_unity_status(self, connected: bool):
         self.connect_button["text"] = "Unityに接続済" if connected else "Unityに接続"
@@ -51,8 +89,7 @@ class UnityStepUI:
         )
 
     def set_start_button_enabled(self, enabled: bool):
-        state = "normal" if enabled else "disabled"
-        self.start_button["state"] = state
+        self.start_button["state"] = "normal" if enabled else "disabled"
 
     def show_started(self):
         if self.started_text is None:
@@ -88,9 +125,9 @@ class UnityStepController:
 
         self.on_status_change = None  # 状態変化時のUI更新用
 
-    def connect_unity(self, ip: str):
+    def connect_unity(self, ip: str, port: int):
         if not self.unity_client.connected:
-            self.unity_client.connect(ip, 51234)
+            self.unity_client.connect(ip, port)
 
     def connect_arduino(self):
         if not self.arduino_client.connected:
@@ -174,11 +211,10 @@ class UnityStep(Step):
 
     def _connect_unity(self):
         ip = self.ui.get_ip()
-        self.ui.set_unity_status(False)
-        self.controller.connect_unity(ip)
+        port = self.ui.get_port()
+        self.controller.connect_unity(ip, port)
 
     def _connect_arduino(self):
-        self.ui.set_arduino_status(False)
         self.controller.connect_arduino()
 
     def _start(self):
@@ -207,9 +243,10 @@ class UnityStepFactory:
 
     def create(self, frame: ttk.Frame, set_complete: Callable[[bool], None]) -> Step:
         condition = self.data_container["condition"]
-        ui = UnityStepUI(condition)
+        ui = UnityStepUI(frame)
         decoder = MultiTypeDataDecoder({STRING_DATA_TYPE: StringDataDecoder()})
         unity_client = TCPClient(decoder)
         arduino_client = ArduinoSerial(port="COM3")
         controller = UnityStepController(unity_client, arduino_client, condition)
+        print(type(frame))
         return UnityStep(frame, set_complete, ui, controller)
