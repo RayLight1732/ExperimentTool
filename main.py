@@ -1,7 +1,7 @@
 from pathlib import Path
 from network.tcp_server import TCPServer
 from network.data.data_decoder import DecodedData
-from network.data.image_data import IMAGE_DATA_TYPE,ImageDataDecoder
+from network.data.image_data import IMAGE_DATA_TYPE, ImageDataDecoder
 from step.initial_step import InitialStepFactory
 from step.ssq_step import SSQStepFactory
 from step.unity_step import UnityStepFactory
@@ -11,7 +11,8 @@ import ctypes
 import tkinter as tk
 import argparse
 import yaml
-from gui import MainWindow,StepManager
+from gui import MainWindow, StepManager
+
 
 def on_receive(queue: queue.Queue, decodedData: DecodedData):
     if decodedData.get_name() == IMAGE_DATA_TYPE:
@@ -39,7 +40,7 @@ def on_receive(queue: queue.Queue, decodedData: DecodedData):
 # ---------------------
 # main
 # ---------------------
-def main(working_dir:Path):
+def main(working_dir: Path):
     decoder = ImageDataDecoder()
     q = queue.Queue(0)
     server = TCPServer(decoder, lambda data: on_receive(q, data), port=51234)
@@ -49,7 +50,6 @@ def main(working_dir:Path):
         ctypes.windll.shcore.SetProcessDpiAwareness(1)  # PROCESS_SYSTEM_DPI_AWARE
     except Exception:
         pass
-        
 
     root = tk.Tk()
     root.geometry("800x600")
@@ -58,18 +58,14 @@ def main(working_dir:Path):
     data_container = {}
 
     name_step_factory = InitialStepFactory(data_container)
-    before_ssq_factory = SSQStepFactory(
-        working_dir, data_container, q, lambda: print("save"), "before"
-    )
+    before_ssq_factory = SSQStepFactory(working_dir, data_container, q, "before")
     unity_step_factory = UnityStepFactory(data_container)
-    after_ssq_factory = SSQStepFactory(
-        working_dir, data_container, q, lambda: print("save"), "after"
-    )
+    after_ssq_factory = SSQStepFactory(working_dir, data_container, q, "after")
     factories = [
         name_step_factory.create,
-        #before_ssq_factory.create,
-        unity_step_factory.create,
-        #after_ssq_factory.create,
+        before_ssq_factory.create,
+        # unity_step_factory.create,
+        # after_ssq_factory.create,
     ]
 
     manager = StepManager(factories)
@@ -86,7 +82,12 @@ def main(working_dir:Path):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="YAMLからworking_dirを取得")
-    parser.add_argument("yaml_path", nargs="?", default="settings.yaml", help="設定ファイル (デフォルト: settings.yaml)")
+    parser.add_argument(
+        "yaml_path",
+        nargs="?",
+        default="settings.yaml",
+        help="設定ファイル (デフォルト: settings.yaml)",
+    )
 
     args = parser.parse_args()
     try:
@@ -96,7 +97,6 @@ if __name__ == "__main__":
         print("config file does not exist.")
         exit(1)
 
-    
     # working_dir を取得
     working_dir = config.get("working_dir")
     main(Path(working_dir))
