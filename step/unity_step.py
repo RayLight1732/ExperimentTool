@@ -7,139 +7,185 @@ from network.data.string_data import STRING_DATA_TYPE, StringDataDecoder, String
 from network.tcp_client import TCPClient
 from network.data.data_decoder import DecodedData
 from network.simple_serial import ArduinoSerial
-import step.util as sutil
+
+class UnityStepUI:
+    def __init__(self, container: ttk.Frame):
+        self.container = container
+        self.ip_entry = None
+        self.connect_button = None
+        self.arduino_connect_button = None
+        self.start_button = None
+        self.started_text = None
+
+    def build(self, on_connect_unity, on_connect_arduino, on_start):
+        ttk.Label(self.container, text="ipアドレス").pack(side="top")
+        self.ip_entry = ttk.Entry(self.container)
+        self.ip_entry.insert(0, "127.0.0.1")
+        self.ip_entry.pack(pady=(0, 10), side="top")
+
+        self.connect_button = ttk.Button(self.container, text="Unityに接続", command=on_connect_unity)
+        self.connect_button.pack(side="top")
+
+        self.arduino_connect_button = ttk.Button(self.container, text="Arduinoに接続", command=on_connect_arduino)
+        self.arduino_connect_button.pack(side="top")
+
+        self.start_button = ttk.Button(self.container, text="開始", state="disabled", command=on_start)
+        self.start_button.pack(side="top")
+
+    def get_ip(self):
+        return self.ip_entry.get()
+
+    def set_unity_status(self, connected: bool):
+        self.connect_button["text"] = "Unityに接続済" if connected else "Unityに接続"
+
+    def set_arduino_status(self, connected: bool):
+        self.arduino_connect_button["text"] = "Arduinoに接続済" if connected else "Arduinoに接続"
+
+    def set_start_button_enabled(self, enabled: bool):
+        state = "normal" if enabled else "disabled"
+        self.start_button["state"] = state
+
+    def show_started(self):
+        if self.started_text is None:
+            self.started_text = tk.Label(self.container, text="実験中")
+            self.started_text.pack(pady=20)
+
+    def show_finished(self):
+        if self.started_text:
+            self.started_text.destroy()
+        tk.Label(self.container, text="終了しました").pack(pady=20)
+
+    def destroy_start_button(self):
+        self.start_button.destroy()
+
+class UnityStepController:
+    def __init__(self, unity_client: TCPClient, arduino_client: ArduinoSerial, condition: int):
+        self.unity_client = unity_client
+        self.arduino_client = arduino_client
+        self.condition = condition
+        self.on_started = None
+        self.on_finished = None
+
+        self.unity_client.on_receive = self.on_receive
+        self.unity_client.on_connected = self._on_unity_connected
+        self.unity_client.on_disconnected = self._on_unity_disconnected
+
+        self.arduino_client.on_receive = self.on_arduino_receive
+        self.arduino_client.on_connected = self._on_arduino_connected
+        self.arduino_client.on_disconnected = self._on_arduino_disconnected
+
+        self.on_status_change = None  # 状態変化時のUI更新用
+
+    def connect_unity(self, ip: str):
+        if not self.unity_client.connected:
+            self.unity_client.connect(ip, 51234)
+
+    def connect_arduino(self):
+        if not self.arduino_client.connected:
+            self.arduino_client.connect()
+
+    def can_start(self):
+        return self.arduino_client.connected and self.unity_client.connected
+
+    def start(self):
+        self.arduino_client.send("start")
+        self.unity_client.send_data()
+
+    def _on_unity_connected(self):
+        if self.on_status_change:
+            self.on_status_change()
+
+    def _on_unity_disconnected(self):
+        if self.on_status_change:
+            self.on_status_change()
+
+    def _on_arduino_connected(self):
+        if self.on_status_change:
+            self.on_status_change()
+
+    def _on_arduino_disconnected(self):
+        if self.on_status_change:
+            self.on_status_change()
+
+    def on_receive(self, decodedData: DecodedData):
+        if decodedData.get_name() == STRING_DATA_TYPE:
+            message = decodedData.get_data()
+            if message == "end":
+                self.arduino_client.send("end")
+                if self.on_finished:
+                    self.on_finished()
+            elif message == "started":
+                self.arduino_client.send(f"mode{self.condition}")
+                self.arduino_client.send("start")
+                if self.on_started:
+                    self.on_started()
+            elif message == "high":
+                self.arduino_client.send("high")
+            elif message == "low":
+                self.arduino_client.send("low")
+        else:
+            print(f"Receive {decodedData.get_name()}")
+
+    def on_arduino_receive(self, msg: str):
+        print(f"receive: {msg}")
+
+    def dispose(self):
+        self.unity_client.disconnect()
+        self.arduino_client.disconnect()
+
 
 class UnityStep(Step):
     def __init__(
         self,
         container: ttk.Frame,
         set_complete: Callable[[bool], None],
-        condition: int,
-        unity_client: TCPClient,
-        arduino_client: ArduinoSerial,
+        step_ui:UnityStepUI,
+        controller:UnityStepController
     ):
         super().__init__(container, set_complete)
+
+        self.ui = step_ui
+        self.controller = controller
         self.set_complete = set_complete
 
-        self.condition = condition
-
-        self.unity_client = unity_client
-        self.unity_client.on_receive = self.on_receive
-        self.unity_client.on_disconnected = self.on_unity_disconnected
-        self.unity_client.on_connected = self.on_unity_connected
-
-        self.arduino_client = arduino_client
-        self.arduino_client.on_disconnected = self.on_arduino_disconnected
-        self.arduino_client.on_receive = self.on_arduino_receive
-        self.arduino_client.on_connected = self.on_arduino_connected
-
-        self.start_button = None
-        self.started_text = None
+        self.controller.on_started = self.ui.show_started
+        self.controller.on_finished = self._on_finished
+        self.controller.on_status_change = self._update_status
 
     def build(self):
-        ttk.Label(self.container, text="ipアドレス").pack(side="top")
-        self.ip_entry = ttk.Entry(self.container)
-        self.ip_entry.insert(0, "127.0.0.1")
-        self.ip_entry.pack(pady=(0, 10), side="top")
-        self.connect_button = ttk.Button(
-            master=self.container,
-            command=self.try_connect_unity,
-            text="Unityに接続",
+        self.ui.build(
+            on_connect_unity=self._connect_unity,
+            on_connect_arduino=self._connect_arduino,
+            on_start=self._start,
         )
-        self.connect_button.pack(side="top")
-        self.arduino_connect_button = ttk.Button(
-            master=self.container,
-            command=self.try_connect_arduino,
-            text="Arduinoに接続",
-        )
-        self.arduino_connect_button.pack(side="top")
 
-        self.start_button = ttk.Button(
-            master=self.container,
-            text="開始",
-            state="disabled",
-            command=self.on_start_button_pressed,
-        )
-        self.start_button.pack(side="top")
+    def _connect_unity(self):
+        ip = self.ui.get_ip()
+        self.ui.set_unity_status(False)
+        self.controller.connect_unity(ip)
 
+    def _connect_arduino(self):
+        self.ui.set_arduino_status(False)
+        self.controller.connect_arduino()
 
-    # TODO 非同期にする
-    def try_connect_unity(self):
-        if not self.unity_client.connected:
-            ip = self.ip_entry.get()
-            self.connect_button["text"] = "Unityに接続中"
-            self.unity_client.connect(host=ip, port=51234)
+    def _start(self):
+        self.controller.start()
+        self.ui.destroy_start_button()
 
-    # TODO 非同期にする
-    def try_connect_arduino(self):
-        if not self.arduino_client.connected:
-            self.arduino_connect_button["text"] = "Arduinoに接続中"
-            self.arduino_client.connect()
+    def _update_status(self):
+        self.ui.set_unity_status(self.controller.unity_client.connected)
+        self.ui.set_arduino_status(self.controller.arduino_client.connected)
+        self.ui.set_start_button_enabled(self.controller.can_start())
 
-    def on_unity_connected(self):
-        self._update_start_button_state()
-        self.connect_button["text"] = "Unityに接続済"
-
-    def on_unity_disconnected(self):
-        self._update_start_button_state()
-        self.connect_button["text"] = "Unityに接続"
-
-    def on_arduino_connected(self):
-        self._update_start_button_state()
-        self.arduino_connect_button["text"] = "Arduinoに接続済"
-
-    def on_arduino_disconnected(self):
-        self._update_start_button_state()
-        self.arduino_connect_button["text"] = "Arduinoに接続"
-
-    def _can_start(self):
-        return self.arduino_client.connected and self.unity_client.connected
-
-    def _update_start_button_state(self):
-        state = "normal" if self._can_start() else "disabled"
-        self.start_button.config(state=state)
-
-    def on_start_button_pressed(self):
-        self.arduino_client.send("start")
-        self.start_button.destroy()
+    def _on_finished(self):
+        self.ui.show_finished()
+        self.set_complete(True)
 
     def on_dispose(self):
-        self.unity_client.disconnect()
-        self.arduino_client.disconnect()
+        self.controller.dispose()
 
     def before_next(self):
         pass
-
-    def _on_remote_start(self):
-        self.arduino_client.send(f"mode{self.condition}")
-        self.arduino_client.send("start")
-        if self.started_text is None:
-            self.started_text = tk.Label(self.container, text="実験中")
-            self.started_text.pack(pady=20)
-
-    def on_receive(self, decodedData: DecodedData):
-        if decodedData.get_name() == STRING_DATA_TYPE:
-            print(f"Receive StringData:{decodedData.get_data()}")
-            message = decodedData.get_data()
-            if message == "end":
-                self._on_end()
-            elif message == "started":
-                self._on_remote_start()
-            elif message == "high":
-                self.arduino_client.send("high")
-            elif message == "low":
-                self.arduino_client.send("low\n")
-        else:
-            print(f"Recieve {decodedData.get_name()}")
-
-    def on_arduino_receive(self, msg: str):
-        print(f"receive:{msg}")
-
-    def _on_end(self):
-        self.arduino_client.send("end")
-        self.started_text.destroy()
-        tk.Label(self.container, text="終了しました").pack(pady=20)
-        self.set_complete(True)
 
 
 class UnityStepFactory:
@@ -148,7 +194,9 @@ class UnityStepFactory:
 
     def create(self, frame: ttk.Frame, set_complete: Callable[[bool], None]) -> Step:
         condition = self.data_container["condition"]
+        ui = UnityStepUI(condition)
         decoder = MultiTypeDataDecoder({STRING_DATA_TYPE: StringDataDecoder()})
         unity_client = TCPClient(decoder)
         arduino_client = ArduinoSerial(port="COM3")
-        return UnityStep(frame, set_complete, condition, unity_client, arduino_client)
+        controller = UnityStepController(unity_client,arduino_client,condition)
+        return UnityStep(frame, set_complete, ui,controller)
