@@ -67,9 +67,9 @@ def main(working_dir:Path):
     )
     factories = [
         name_step_factory.create,
-        before_ssq_factory.create,
+        #before_ssq_factory.create,
         unity_step_factory.create,
-        after_ssq_factory.create,
+        #after_ssq_factory.create,
     ]
 
     manager = StepManager(factories)

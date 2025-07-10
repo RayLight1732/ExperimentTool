@@ -1,4 +1,5 @@
 from network.data.data_decoder import DataDecoder, DecodedData
+from network.data.serializable_data import SerializableData
 import socket
 from typing import Any
 
@@ -16,3 +17,13 @@ class MultiTypeDataDecoder(DataDecoder):
         if decoder is None:
             raise Exception("Decoder does not found.")
         return decoder.accept(sock)
+
+class MultiTypeData(SerializableData):
+    def __init__(self,data:SerializableData):
+        self.data = data
+        
+    def to_bytes(self) -> bytes:
+        return self.message.encode()
+
+    def name(self) -> str:
+        return STRING_DATA_TYPE
