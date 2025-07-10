@@ -31,7 +31,7 @@ class TCPClient:
         port=12345,
     ) -> bool:
         with self._lock:
-            if self._connected:
+            if self.connected:
                 return False
 
             try:
@@ -57,6 +57,8 @@ class TCPClient:
 
     def disconnect(self):
         with self._lock:
+            if not self.connected:
+                return
             print("Disconnecting...")
             if self._receiver:
                 self._receiver.stop()

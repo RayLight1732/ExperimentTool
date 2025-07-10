@@ -1,18 +1,8 @@
 import tkinter as tk
 from tkinter import messagebox, ttk
 from typing import Callable, List, Optional
-from abc import ABC, abstractmethod
 from step.step import Step
-from step.initial_step import InitialStepFactory
-from step.order_step import OrderStepFactory
-from step.ssq_step import SSQStepFactory
-from step.unity_step import UnityStepFactory
-from network.data.image_data import ImageDataDecoder, IMAGE_DATA_TYPE
-from network.tcp_server import TCPServer
-from network.data.data_decoder import DecodedData
-import queue
-from pathlib import Path
-from PIL import ExifTags, ImageFile
+from PIL import ImageFile
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
@@ -113,72 +103,3 @@ class StepManager:
             self.step.before_next()
         self.show_step(self.current + 1)
 
-
-def on_receive(queue: queue.Queue, decodedData: DecodedData):
-    if decodedData.get_name() == IMAGE_DATA_TYPE:
-        image = decodedData.get_data()
-
-        exif = image._getexif()
-
-        # Orientationタグを探す
-        if exif is not None:
-            for tag, value in exif.items():
-                tag_name = ExifTags.TAGS.get(tag)
-                if tag_name == "Orientation":
-                    orientation = value
-                    if orientation == 3:
-                        image = image.rotate(180, expand=True)
-                    elif orientation == 6:
-                        image = image.rotate(270, expand=True)
-                    elif orientation == 8:
-                        image = image.rotate(90, expand=True)
-        queue.put(image)
-    else:
-        print(f"Recieve {decodedData.get_name()}")
-
-
-# ---------------------
-# main
-# ---------------------
-def main():
-    working_dir = Path("C:\\Users\\arusu\\Downloads")
-    decoder = ImageDataDecoder()
-    q = queue.Queue(0)
-    server = TCPServer(decoder, lambda data: on_receive(q, data), port=51234)
-    server.start_server()
-
-    root = tk.Tk()
-    root.geometry("400x300")
-    root.title("実験フロー")
-
-    data_container = {}
-
-    name_step_factory = InitialStepFactory(data_container)
-    before_ssq_factory = SSQStepFactory(
-        working_dir, data_container, q, lambda: print("save"), "before"
-    )
-    unity_step_factory = UnityStepFactory(data_container)
-    after_ssq_factory = SSQStepFactory(
-        working_dir, data_container, q, lambda: print("save"), "after"
-    )
-    factories = [
-        name_step_factory.create,
-        before_ssq_factory.create,
-        # unity_step_factory.create,
-        after_ssq_factory.create,
-    ]
-
-    manager = StepManager(factories)
-    window = MainWindow(
-        root,
-        on_press_next=manager.next_step,
-        on_press_return_first=lambda: manager.show_step(0),
-    )
-    manager.main_window = window
-    manager.show_step(0)
-
-    root.mainloop()
-
-
-if __name__ == "__main__":
-    main()
