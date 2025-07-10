@@ -31,7 +31,7 @@ class SSQStepUI:
         camera_container = ttk.Frame(self.container)
         camera_container.grid(row=0, column=0, sticky="nsew")
         self.canvas = tk.Canvas(
-            camera_container, highlightthickness=0, background="gray"
+            camera_container, highlightthickness=0, background="gray", width=10
         )
         self.canvas.pack(side="top", fill="both", expand=True)
         self.canvas.bind("<Configure>", on_resize)
