@@ -119,4 +119,4 @@ class InitialStepFactory:
             self.data_container["timestamp"] = timestamp
 
         ui = InitialStepUI(frame)
-        return InitialStep(frame, ui, set_complete, save)
+        return InitialStep(ui, set_complete, save)
