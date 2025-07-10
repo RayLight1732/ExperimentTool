@@ -43,8 +43,8 @@ def on_receive(queue: queue.Queue, decodedData: DecodedData):
 def main(working_dir: Path):
     decoder = ImageDataDecoder()
     q = queue.Queue(0)
-    # server = TCPServer(decoder, lambda data: on_receive(q, data), port=51234)
-    # server.start_server()
+    server = TCPServer(decoder, lambda data: on_receive(q, data), port=51234)
+    server.start_server()
 
     try:
         ctypes.windll.shcore.SetProcessDpiAwareness(1)  # PROCESS_SYSTEM_DPI_AWARE
@@ -63,9 +63,9 @@ def main(working_dir: Path):
     after_ssq_factory = SSQStepFactory(working_dir, data_container, q, "after")
     factories = [
         name_step_factory.create,
-        # before_ssq_factory.create,
+        before_ssq_factory.create,
         unity_step_factory.create,
-        # after_ssq_factory.create,
+        after_ssq_factory.create,
     ]
 
     manager = StepManager(factories)
