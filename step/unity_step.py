@@ -8,6 +8,7 @@ from network.tcp_client import TCPClient
 from network.data.data_decoder import DecodedData
 from network.simple_serial import ArduinoSerial
 
+
 class UnityStepUI:
     def __init__(self, container: ttk.Frame):
         self.container = container
@@ -23,13 +24,19 @@ class UnityStepUI:
         self.ip_entry.insert(0, "127.0.0.1")
         self.ip_entry.pack(pady=(0, 10), side="top")
 
-        self.connect_button = ttk.Button(self.container, text="Unityに接続", command=on_connect_unity)
+        self.connect_button = ttk.Button(
+            self.container, text="Unityに接続", command=on_connect_unity
+        )
         self.connect_button.pack(side="top")
 
-        self.arduino_connect_button = ttk.Button(self.container, text="Arduinoに接続", command=on_connect_arduino)
+        self.arduino_connect_button = ttk.Button(
+            self.container, text="Arduinoに接続", command=on_connect_arduino
+        )
         self.arduino_connect_button.pack(side="top")
 
-        self.start_button = ttk.Button(self.container, text="開始", state="disabled", command=on_start)
+        self.start_button = ttk.Button(
+            self.container, text="開始", state="disabled", command=on_start
+        )
         self.start_button.pack(side="top")
 
     def get_ip(self):
@@ -39,7 +46,9 @@ class UnityStepUI:
         self.connect_button["text"] = "Unityに接続済" if connected else "Unityに接続"
 
     def set_arduino_status(self, connected: bool):
-        self.arduino_connect_button["text"] = "Arduinoに接続済" if connected else "Arduinoに接続"
+        self.arduino_connect_button["text"] = (
+            "Arduinoに接続済" if connected else "Arduinoに接続"
+        )
 
     def set_start_button_enabled(self, enabled: bool):
         state = "normal" if enabled else "disabled"
@@ -58,8 +67,11 @@ class UnityStepUI:
     def destroy_start_button(self):
         self.start_button.destroy()
 
+
 class UnityStepController:
-    def __init__(self, unity_client: TCPClient, arduino_client: ArduinoSerial, condition: int):
+    def __init__(
+        self, unity_client: TCPClient, arduino_client: ArduinoSerial, condition: int
+    ):
         self.unity_client = unity_client
         self.arduino_client = arduino_client
         self.condition = condition
@@ -89,7 +101,8 @@ class UnityStepController:
 
     def start(self):
         self.arduino_client.send("start")
-        self.unity_client.send_data()
+        # TODO MultiType dataに変更
+        self.unity_client.send_data(StringData("start"))
 
     def _on_unity_connected(self):
         if self.on_status_change:
@@ -139,8 +152,8 @@ class UnityStep(Step):
         self,
         container: ttk.Frame,
         set_complete: Callable[[bool], None],
-        step_ui:UnityStepUI,
-        controller:UnityStepController
+        step_ui: UnityStepUI,
+        controller: UnityStepController,
     ):
         super().__init__(container, set_complete)
 
@@ -198,5 +211,5 @@ class UnityStepFactory:
         decoder = MultiTypeDataDecoder({STRING_DATA_TYPE: StringDataDecoder()})
         unity_client = TCPClient(decoder)
         arduino_client = ArduinoSerial(port="COM3")
-        controller = UnityStepController(unity_client,arduino_client,condition)
-        return UnityStep(frame, set_complete, ui,controller)
+        controller = UnityStepController(unity_client, arduino_client, condition)
+        return UnityStep(frame, set_complete, ui, controller)

@@ -14,6 +14,7 @@ class DataSender:
     def send(self, data: SerializableData):
         try:
             with self.lock:
+                # TODO length dataに変更
                 encoded = data.name().encode()
                 size = len(encoded)
                 size_header = size.to_bytes(4, byteorder="little")

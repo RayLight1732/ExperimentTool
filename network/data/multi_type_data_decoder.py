@@ -3,6 +3,8 @@ from network.data.serializable_data import SerializableData
 import socket
 from typing import Any
 
+MULTI_TYPE_DATA = "MultiTypeData"
+
 
 class MultiTypeDataDecoder(DataDecoder):
 
@@ -18,12 +20,17 @@ class MultiTypeDataDecoder(DataDecoder):
             raise Exception("Decoder does not found.")
         return decoder.accept(sock)
 
+
 class MultiTypeData(SerializableData):
-    def __init__(self,data:SerializableData):
+    def __init__(self, data: SerializableData):
         self.data = data
-        
+
     def to_bytes(self) -> bytes:
-        return self.message.encode()
+        # TODO size name dataに変更
+        encoded = self.data.name().encode()
+        size = len(encoded)
+        size_header = size.to_bytes(4, byteorder="little")
+        return size_header + encoded + self.data.to_bytes()
 
     def name(self) -> str:
-        return STRING_DATA_TYPE
+        return MULTI_TYPE_DATA
