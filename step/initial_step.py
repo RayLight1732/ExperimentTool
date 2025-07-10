@@ -4,6 +4,7 @@ from step.step import Step
 from datetime import datetime
 import step.util as sutil
 
+
 class InitialStep(Step):
     def __init__(
         self,
@@ -29,7 +30,9 @@ class InitialStep(Step):
         )
         self.entry.pack()
 
-        self.mode_label = ttk.Label(self.container, text="冷却モードを選択").pack(pady=(10, 0))
+        self.mode_label = ttk.Label(self.container, text="冷却モードを選択").pack(
+            pady=(10, 0)
+        )
         val_cmd2 = self.container.register(self.validate_mode_combobox)
         self.mode_combobox = ttk.Combobox(
             self.container,
@@ -50,6 +53,7 @@ class InitialStep(Step):
         )
 
     def _show_position_selector(self):
+        print("show")
         self.position_label.pack(pady=(10, 0))
         self.position_combobox.pack()
 
@@ -67,32 +71,35 @@ class InitialStep(Step):
 
     def validate_mode_combobox(self, d, i, P, s, S, v, V, W):
         self.mode = sutil.get_mode_number(P)
-        print("mode",self.mode)
-        if self.mode != sutil.MODE_NEVER:
+        print("mode", self.mode)
+        if self.mode != sutil.MODE_NEVER and self.mode != -1:
             self._show_position_selector()
         else:
             self._hide_podition_selector()
         self.set_complete(self.can_go_next())
         return True
-    
+
     def validate_position_combobox(self, d, i, P, s, S, v, V, W):
         self.position = sutil.get_position_number(P)
         self.set_complete(self.can_go_next())
         return True
-    
-    
-    def can_go_next(self)->bool:
-        if not self.name_set or self.mode == -1: #名前とmodeは必須
+
+    def can_go_next(self) -> bool:
+        if not self.name_set or self.mode == -1:  # 名前とmodeは必須
             return False
-        if self.mode == sutil.MODE_NEVER: #modeがなしだったらtrue
+        if self.mode == sutil.MODE_NEVER:  # modeがなしだったらtrue
             return True
         else:
-            return self.position != sutil.POSITION_NONE #modeが何かしらに設定されてたら、positionが入力されていたらtrue
+            return (
+                self.position != sutil.POSITION_NONE
+            )  # modeが何かしらに設定されてたら、positionが入力されていたらtrue
 
     def before_next(self):
         if self.mode == sutil.MODE_NEVER:
             self.position = sutil.POSITION_NONE
-        self.save_value(self.entry.get(),sutil.calc_condition(self.mode,self.position))
+        self.save_value(
+            self.entry.get(), sutil.calc_condition(self.mode, self.position)
+        )
 
 
 class InitialStepFactory:
@@ -100,7 +107,7 @@ class InitialStepFactory:
         self.data_container = data_container
 
     def create(self, frame: ttk.Frame, set_complete: Callable[[bool], None]) -> Step:
-        def save(name: str,condition:int):
+        def save(name: str, condition: int):
             self.data_container["name"] = name
             self.data_container["condition"] = condition
             now = datetime.now()
