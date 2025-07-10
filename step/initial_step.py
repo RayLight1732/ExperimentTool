@@ -1,105 +1,111 @@
 from tkinter import ttk
-from typing import Callable
+import tkinter as tk
+from typing import Callable, Optional
 from step.step import Step
 from datetime import datetime
 import step.util as sutil
+
+
+class InitialStepUI:
+    def __init__(self, container: ttk.Frame):
+        self.container = container
+        self.on_change: Optional[Callable[[], None]] = None
+        self.name_entry = None
+        self.mode_combobox = None
+        self.position_combobox = None
+        self.name = ""
+        self.mode = -1
+        self.position = sutil.POSITION_NONE
+        self.position_label = None
+
+    def build(self):
+        ttk.Label(self.container, text="名前を入力").pack()
+        self.name_var = tk.StringVar()
+        self.name_var.trace_add("write", self._on_name_change)
+        self.name_entry = ttk.Entry(self.container, textvariable=self.name_var)
+        self.name_entry.pack()
+
+        ttk.Label(self.container, text="冷却モードを選択").pack(pady=(10, 0))
+        self.mode_var = tk.StringVar()
+        self.mode_combobox = ttk.Combobox(
+            self.container,
+            state="readonly",
+            values=sutil.MODE,
+            textvariable=self.mode_var,
+        )
+        self.mode_combobox.pack()
+        self.mode_var.trace_add("write", self._on_mode_change)
+
+        self.position_label = ttk.Label(self.container, text="冷却場所を選択")
+        self.position_var = tk.StringVar()
+        self.position_combobox = ttk.Combobox(
+            self.container,
+            state="readonly",
+            values=sutil.POSITIONS[1:],
+            textvariable=self.position_var,
+        )
+        self.position_var.trace_add("write", self._on_position_change)
+
+    def _on_name_change(self, *args):
+        self.name = self.name_var.get()
+        self.on_change()
+
+    def _on_mode_change(self, *args):
+        self.mode = sutil.get_mode_number(self.mode_var.get())
+        if self.mode != sutil.MODE_NEVER and self.mode != -1:
+            self.show_position_selector()
+        else:
+            self.hide_position_selector()
+        self.on_change()
+
+    def _on_position_change(self, *args):
+        self.position = sutil.get_position_number(self.position_var.get())
+        self.on_change()
+
+    def show_position_selector(self):
+        self.position_label.pack(pady=(10, 0))
+        self.position_combobox.pack()
+
+    def hide_position_selector(self):
+        self.position_label.pack_forget()
+        self.position_combobox.pack_forget()
 
 
 class InitialStep(Step):
     def __init__(
         self,
         container: ttk.Frame,
+        ui: InitialStepUI,
         set_complete: Callable[[bool], None],
         save_value: Callable[[str, int], None],
     ):
         super().__init__(container, set_complete)
+        self.set_complete = set_complete
         self.save_value = save_value
-        self.name_set = False
-        self.mode = -1
-        self.position = sutil.POSITION_NONE
-        self.position_label = None
-        self.position_button = None
+        self.ui = ui
+        self.ui.on_change = self.on_value_change
 
     def build(self):
-        ttk.Label(self.container, text="名前を入力").pack()
-        val_cmd = self.container.register(self.validate_name)
-        self.entry = ttk.Entry(
-            self.container,
-            validate="key",
-            validatecommand=(val_cmd, "%d", "%i", "%P", "%s", "%S", "%v", "%V", "%W"),
-        )
-        self.entry.pack()
+        self.ui.build()
 
-        self.mode_label = ttk.Label(self.container, text="冷却モードを選択").pack(
-            pady=(10, 0)
-        )
-        val_cmd2 = self.container.register(self.validate_mode_combobox)
-        self.mode_combobox = ttk.Combobox(
-            self.container,
-            state="readonly",
-            values=sutil.MODE,
-            validate="all",
-            validatecommand=(val_cmd2, "%d", "%i", "%P", "%s", "%S", "%v", "%V", "%W"),
-        ).pack()
+    def on_value_change(self):
+        self.set_complete(self.can_proceed())
 
-        self.position_label = ttk.Label(self.container, text="冷却場所を選択")
-        val_cmd3 = self.container.register(self.validate_position_combobox)
-        self.position_combobox = ttk.Combobox(
-            self.container,
-            state="readonly",
-            values=sutil.POSITIONS[1:],
-            validate="all",
-            validatecommand=(val_cmd3, "%d", "%i", "%P", "%s", "%S", "%v", "%V", "%W"),
-        )
-
-    def _show_position_selector(self):
-        print("show")
-        self.position_label.pack(pady=(10, 0))
-        self.position_combobox.pack()
-
-    def _hide_podition_selector(self):
-        self.position_label.pack_forget()
-        self.position_combobox.pack_forget()
+    def before_next(self):
+        mode = self.ui.mode
+        position = self.ui.position if mode != sutil.MODE_NEVER else sutil.POSITION_NONE
+        condition = sutil.calc_condition(mode, position)
+        self.save_value(self.ui.name, condition)
 
     def on_dispose(self):
         pass
 
-    def validate_name(self, d, i, P, s, S, v, V, W):
-        self.name_set = len(P) > 0
-        self.set_complete(self.can_go_next())
-        return True
-
-    def validate_mode_combobox(self, d, i, P, s, S, v, V, W):
-        self.mode = sutil.get_mode_number(P)
-        print("mode", self.mode)
-        if self.mode != sutil.MODE_NEVER and self.mode != -1:
-            self._show_position_selector()
-        else:
-            self._hide_podition_selector()
-        self.set_complete(self.can_go_next())
-        return True
-
-    def validate_position_combobox(self, d, i, P, s, S, v, V, W):
-        self.position = sutil.get_position_number(P)
-        self.set_complete(self.can_go_next())
-        return True
-
-    def can_go_next(self) -> bool:
-        if not self.name_set or self.mode == -1:  # 名前とmodeは必須
+    def can_proceed(self) -> bool:
+        if not self.ui.name or self.ui.mode == -1:
             return False
-        if self.mode == sutil.MODE_NEVER:  # modeがなしだったらtrue
+        if self.ui.mode == sutil.MODE_NEVER:
             return True
-        else:
-            return (
-                self.position != sutil.POSITION_NONE
-            )  # modeが何かしらに設定されてたら、positionが入力されていたらtrue
-
-    def before_next(self):
-        if self.mode == sutil.MODE_NEVER:
-            self.position = sutil.POSITION_NONE
-        self.save_value(
-            self.entry.get(), sutil.calc_condition(self.mode, self.position)
-        )
+        return self.ui.position != sutil.POSITION_NONE
 
 
 class InitialStepFactory:
@@ -114,4 +120,5 @@ class InitialStepFactory:
             timestamp = now.strftime("%Y%m%d_%H%M%S")
             self.data_container["timestamp"] = timestamp
 
-        return InitialStep(frame, set_complete, save)
+        ui = InitialStepUI(frame)
+        return InitialStep(frame, ui, set_complete, save)
