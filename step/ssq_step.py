@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import ttk
-from typing import Callable, Optional
+from typing import Callable, Optional,Tuple
 from PIL import Image
 import PIL.ImageTk
 from step.step import Step
@@ -118,18 +118,23 @@ class SSQImageProcessor:
         self.correction_processor = correction_processor
         self.markseat_reader = markseat_reader
 
-    def read_answers(self, image: Image.Image) -> list[int] | None:
+    def read_answers(self, image: Image.Image) -> Tuple[list[int],np.ndarray] | Tuple[None,None]:
         opencv_image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
-        corrected = self.correction_processor.correct(opencv_image)
+        corrected,rect = self.correction_processor.correct(opencv_image)
         if corrected is None:
-            return None
+            return None,None
 
         gray = cv2.cvtColor(corrected, cv2.COLOR_BGR2GRAY)
         result = self.markseat_reader.read(gray)
         answers = []
         for row in result:
             answers.append(row[0] if len(row) == 1 else -1)
-        return answers
+        return answers,rect
+    
+    def overlay_image(self,image:Image.Image,rect,answers:list[int])->cv2.typing.MatLike:
+        marked = [[answer] if answer != -1 else [] for answer in answers ]
+        mask = self.markseat_reader.create_mask(marked)
+        return self.correction_processor.overlay_mask(image,mask,rect,0.5)
 
 
 class SSQDataSaver:
@@ -185,12 +190,15 @@ class SSQStep(Step):
         if self.queue.qsize() > 0:
             image = self.queue.get(False)
             if image:
-                self.image = image
-                self.ui.update_canvas(image)
-                answers = self.processor.read_answers(image)
+                answers,rect= self.processor.read_answers(image)
                 if answers is not None:
                     self.ui.set_radio_values(answers)
                     self._on_radio_update()
+                    self.image = self.processor.overlay_image(image,rect,answers)
+                else:
+                    self.image = image
+                self.ui.update_canvas(image)
+                
         self.after_id = self.container.after(30, self._update)
 
     def _on_radio_update(self):
@@ -227,8 +235,8 @@ class SSQStepFactory:
             rect_margin=rect_margin,
             row=16,
             col=4,
-            width=120,
-            height=60,
+            cell_width=120,
+            cell_height=60,
             cell_margin=margin,
         )
         correction_processor = CorrectionProcessor(1000, 900)

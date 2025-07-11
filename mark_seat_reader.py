@@ -2,6 +2,7 @@ import cv2
 from cv2 import aruco
 import numpy as np
 import dataclasses
+from typing import Tuple,Optional,Union
 
 
 class CorrectionProcessor:
@@ -46,23 +47,63 @@ class CorrectionProcessor:
             if corner is not None:
                 pts.append(corner[corner_id])  # 特定の頂点の座標を順にリストに追加する
         pts1 = np.float32(pts)  # 投影変換する前の四角形
-
+        print(f"found:{len(pts1)}")
+        print(list_ids)
         if len(pts1) == 4:  # 頂点が4つ見つかったとき
             return pts1
         else:
             return None
 
-    def correct(self, frame):
+    def correct(self, frame)->Union[Tuple[cv2.typing.MatLike,np.ndarray],Tuple[None,None]]:
         pts1 = self.get_rectangle(frame)
+        print("try correct")
+        cv2.imwrite("C:\\Project\\PythonDev\\ExperimentTool\\test.png",frame)
         if pts1 is not None:
             M = cv2.getPerspectiveTransform(pts1, self.pts2)  # 投影行列
             rect = cv2.warpPerspective(
                 frame, M, (self.rectW, self.rectH)
             )  # 長方形画像を得る
-            return rect
+            print("get rect")
+            return rect,pts1
         else:
-            return None
+            return None,None
+            
+    def overlay_mask(
+        self,
+        base_img: np.ndarray,
+        mask_img: np.ndarray,
+        pts1: np.ndarray,
+        alpha: float = 1.0,
+        color: tuple[int, int, int] = (0, 0, 0),
+    ) -> np.ndarray:
+        """
+        get_rectangle() で得た領域に、マスク画像を射影変換して指定色で重ねる。
 
+        :param base_img: 元画像（カラー）
+        :param mask_img: マスク画像（白背景に黒＝マーク部分）
+        :param pts1: 実画像上の投影先四角形 (上から時計回りの4点)
+        :param alpha: 色の不透明度 (1.0で完全塗りつぶし）
+        :param color: 上書きする色 (B, G, R) タプル
+        :return: 合成済み画像
+        """
+        # マスク画像（rect → 台形）へ投影変換
+        mask_img = cv2.resize(mask_img,(self.rectW,self.rectH))
+        M = cv2.getPerspectiveTransform(self.pts2, pts1)
+        warped_mask = cv2.warpPerspective(mask_img, M, (base_img.shape[1], base_img.shape[0]))
+
+        # 重ねる対象領域（マスクが黒の部分）
+        mask_area = warped_mask == 0
+
+        # 対象ピクセルだけ色を変更
+        if alpha >= 1.0:
+            base_img[mask_area] = color
+        else:
+            base_img[mask_area] = (
+                base_img[mask_area].astype(np.float32) * (1 - alpha)
+                + np.array(color, dtype=np.float32) * alpha
+            ).astype(np.uint8)
+
+        return base_img
 
 @dataclasses.dataclass(frozen=True)
 class Margin:
@@ -84,8 +125,8 @@ class MarkseatReader:
         rect_margin: Margin,
         row: int,
         col: int,
-        width: int,
-        height: int,
+        cell_width: int,
+        cell_height: int,
         cell_margin: Margin,
     ):
         self.offset_top = rect_margin.margin_top
@@ -95,8 +136,8 @@ class MarkseatReader:
 
         self.row = row
         self.col = col
-        self.width = width
-        self.height = height
+        self.cell_width = cell_width
+        self.cell_height = cell_height
         self.cell_margin = cell_margin
 
     def read(self, src: np.ndarray) -> list[list[int]]:
@@ -107,6 +148,14 @@ class MarkseatReader:
         region = self._extract_region(resized)
         binary = self._binarize_image(region)
         return [self._analyze_row(binary, r) for r in range(self.row)]
+
+    def create_mask(self,marked: list[list[int]]):
+        cell_width, cell_height = self._calculate_cell_size()
+        width = self.offset_left + self.col * cell_width + self.offset_right
+        height = self.offset_top + self.row * cell_height + self.offset_bottom
+        mask = np.ones((height,width), dtype=np.uint8) * 255  # 白背景
+        drawn = self._draw_cells(mask, marked, thickness=-1)
+        return drawn
 
     def highlight_all_cells(self, src: np.ndarray) -> np.ndarray:
         """
@@ -136,14 +185,14 @@ class MarkseatReader:
 
         :param src: 入力画像
         :param marked: 各行の対象セルインデックスリスト
-        :param thickness: 線幅（-1なら塗りつぶし）
+        :param thickness: 線幅（-1なら塗りつぶし)
         :return: 描画済み画像
         """
         resized = self._resize(src)
         for row_index, col_indices in enumerate(marked):
             for col_index in col_indices:
                 top_left = self._get_cell_position(row_index, col_index)
-                bottom_right = (top_left[0] + self.width, top_left[1] + self.height)
+                bottom_right = (top_left[0] + self.cell_width, top_left[1] + self.cell_height)
                 cv2.rectangle(
                     resized, top_left, bottom_right, color=0, thickness=thickness
                 )
@@ -182,7 +231,7 @@ class MarkseatReader:
         for row_index in range(self.row):
             for col_index in range(self.col):
                 x, y = self._get_cell_position_in_rect(row_index, col_index)
-                cell = src[y : y + self.height, x : x + self.width]
+                cell = src[y : y + self.cell_height, x : x + self.cell_width]
                 # TODO ガウスノイズかけてもいいかも
                 # セルごとにOtsuでしきい値処理（マーク＝白、背景＝黒）
                 _, cell_bin = cv2.threshold(
@@ -190,7 +239,7 @@ class MarkseatReader:
                 )
 
                 # 出力画像に埋め込む
-                output[y : y + self.height, x : x + self.width] = cell_bin
+                output[y : y + self.cell_height, x : x + self.cell_width] = cell_bin
 
         return output
 
@@ -201,7 +250,7 @@ class MarkseatReader:
         means = []
         for col_index in range(self.col):
             x, y = self._get_cell_position_in_rect(row_index, col_index)
-            cell = binary[y : y + self.height, x : x + self.width]
+            cell = binary[y : y + self.cell_height, x : x + self.cell_width]
             mean = cv2.mean(cell)[0]
             means.append(mean)
 
@@ -222,10 +271,10 @@ class MarkseatReader:
         セルサイズ（余白込み）を返す
         """
         cell_width = (
-            self.cell_margin.margin_left + self.width + self.cell_margin.margin_right
+            self.cell_margin.margin_left + self.cell_width + self.cell_margin.margin_right
         )
         cell_height = (
-            self.cell_margin.margin_top + self.height + self.cell_margin.margin_bottom
+            self.cell_margin.margin_top + self.cell_height + self.cell_margin.margin_bottom
         )
         return cell_width, cell_height
 
@@ -254,7 +303,7 @@ def main():
     # 80 20
     processor = CorrectionProcessor(1000, 900)
     img = cv2.imread("c:\\Users\\arusu\\Downloads\\DSC_1158.jpg")
-    corrected = processor.correct(img)
+    corrected,rect = processor.correct(img)
     gray = cv2.cvtColor(corrected, cv2.COLOR_BGR2GRAY)
     rect_margin = Margin(230, 1110, 0, 10)
     margin = Margin(15, 75, 75, 15)
@@ -262,8 +311,8 @@ def main():
         rect_margin=rect_margin,
         row=16,
         col=4,
-        width=120,
-        height=60,
+        cell_width=120,
+        cell_height=60,
         cell_margin=margin,
     )
 
@@ -271,8 +320,9 @@ def main():
     for r in result:
         print(r)
 
-    draw = reader.fill_marked_cells(gray, result)
-    cv2.imshow("result", draw)
+    mask = reader.create_mask(result)
+    draw = processor.overlay_mask(img,mask,rect,0.5)
+    cv2.imshow("result", cv2.resize(draw,(400,500)))
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
