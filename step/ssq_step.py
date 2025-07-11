@@ -131,10 +131,14 @@ class SSQImageProcessor:
             answers.append(row[0] if len(row) == 1 else -1)
         return answers,rect
     
-    def overlay_image(self,image:Image.Image,rect,answers:list[int])->cv2.typing.MatLike:
+    def overlay_image(self,image:Image.Image,rect,answers:list[int])->Image.Image:
+        opencv_image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
         marked = [[answer] if answer != -1 else [] for answer in answers ]
         mask = self.markseat_reader.create_mask(marked)
-        return self.correction_processor.overlay_mask(image,mask,rect,0.5)
+        masked = self.correction_processor.overlay_mask(opencv_image,mask,rect,0.5)
+        new_image = cv2.cvtColor(masked, cv2.COLOR_BGR2RGB)
+        new_image = Image.fromarray(new_image)
+        return new_image
 
 
 class SSQDataSaver:
@@ -197,7 +201,7 @@ class SSQStep(Step):
                     self.image = self.processor.overlay_image(image,rect,answers)
                 else:
                     self.image = image
-                self.ui.update_canvas(image)
+                self.ui.update_canvas(self.image)
                 
         self.after_id = self.container.after(30, self._update)
 

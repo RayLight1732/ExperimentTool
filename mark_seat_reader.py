@@ -33,6 +33,7 @@ class CorrectionProcessor:
         """
 
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)  # グレースケールにする
+     
         corners, ids, _ = aruco.detectMarkers(
             gray, self.dic_aruco
         )  # マーカー検出 corners(N,1,4,2) ids(N,1)
@@ -47,8 +48,7 @@ class CorrectionProcessor:
             if corner is not None:
                 pts.append(corner[corner_id])  # 特定の頂点の座標を順にリストに追加する
         pts1 = np.float32(pts)  # 投影変換する前の四角形
-        print(f"found:{len(pts1)}")
-        print(list_ids)
+        print(f"found:{list_ids}")
         if len(pts1) == 4:  # 頂点が4つ見つかったとき
             return pts1
         else:
@@ -56,14 +56,11 @@ class CorrectionProcessor:
 
     def correct(self, frame)->Union[Tuple[cv2.typing.MatLike,np.ndarray],Tuple[None,None]]:
         pts1 = self.get_rectangle(frame)
-        print("try correct")
-        cv2.imwrite("C:\\Project\\PythonDev\\ExperimentTool\\test.png",frame)
         if pts1 is not None:
             M = cv2.getPerspectiveTransform(pts1, self.pts2)  # 投影行列
             rect = cv2.warpPerspective(
                 frame, M, (self.rectW, self.rectH)
             )  # 長方形画像を得る
-            print("get rect")
             return rect,pts1
         else:
             return None,None
