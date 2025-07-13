@@ -93,7 +93,7 @@ class MSSQStepFactory:
         )
         correction_processor = CorrectionProcessor(1075, 860, [4, 5, 7, 6])
         processor = MSSQImageProcessor(correction_processor, reader1, 8, reader2)
-        save_dir = self.working_dir / sutil.get_name(self.data_container)
+        save_dir = self.working_dir / "MSSQ" / sutil.get_name(self.data_container)
         file_name = "MSSQ"
         ui = BaseStepUI(
             frame,
