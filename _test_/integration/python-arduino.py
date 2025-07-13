@@ -20,10 +20,18 @@ if __name__ == "__main__":
     controller = MockUnityStepController(unity_client,arduino_client,condition)
     controller.connect_arduino()
     unity_client.on_receive(StringData("start"))
+    time.sleep(1)
     unity_client.on_receive(StringData("high"))
+    time.sleep(1)
     unity_client.on_receive(StringData("low"))
+    time.sleep(1)
     unity_client.on_receive(StringData("end"))
+    time.sleep(1)
     result = ["mode:0","position:0","all off"]
+    if result == arduino_message:
+        print("true")
+    else:
+        print("false",arduino_message)
 
     arduino_message = []
     condition = sutil.calc_condition(1,1)
@@ -37,3 +45,7 @@ if __name__ == "__main__":
     unity_client.on_receive(StringData("end"))
     result = ["mode:1","position:1","back on","all off"]
     #TODO 値の検証
+    if result == arduino_message:
+        print("true")
+    else:
+        print("false",arduino_message)
