@@ -1,28 +1,26 @@
-import tkinter as tk
-import tkinter.ttk as ttk
+from mark_seat_reader import MarkseatReader,Margin,CorrectionProcessor
+import cv2
 
-root = tk.Tk()
-root.geometry("400x300")
-
-outline = ttk.Frame(master=root)
-outline.pack(fill="both", expand=True, padx=5, pady=5)
-header = ttk.Frame(master=outline)
-footer = ttk.Frame(master=outline)
-container1 = ttk.Frame(master=outline)
-
-header.pack(side="top", fill="both", expand=False)
-footer.pack(side="bottom", fill="both", expand=False, padx=10, pady=5)
-container1.pack(side="left", fill="both", expand=True)
-
-next_button = ttk.Button(
-    master=footer,
-    text="次へ",
-)
-next_button.pack(side="right", ipady=3)
-back_button = ttk.Button(
-    master=footer,
-    text="最初に戻る",
-)
-back_button.pack(side="left", ipady=3)
-
-root.mainloop()
+if __name__ == "__main__":
+    rect_margin = Margin(285, 1110, 0, 60)
+    margin = Margin(15, 75, 75, 15)
+    markseat_reader = MarkseatReader(
+        rect_margin=rect_margin,
+        row=16,
+        col=4,
+        cell_width=120,
+        cell_height=60,
+        cell_margin=margin,
+    )
+    correction_processor = CorrectionProcessor(1000, 900)
+    image = cv2.imread("c:\\Users\\arusu\\Downloads\\DSC_1164.jpg")
+    corrected,rect = correction_processor.correct(image)
+    if corrected is not None:
+        #cv2.imshow("corrected",corrected)
+        gray = cv2.cvtColor(corrected, cv2.COLOR_BGR2GRAY)
+        highlight = markseat_reader.highlight_all_cells(gray)
+        cv2.imshow("highlighted1",cv2.resize(highlight,(0,0),fx=0.5,fy=0.5))
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+    else:
+        print("cannot find")

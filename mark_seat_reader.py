@@ -2,7 +2,7 @@ import cv2
 from cv2 import aruco
 import numpy as np
 import dataclasses
-from typing import Tuple,Optional,Union
+from typing import Tuple,Optional,Union,List
 
 
 class CorrectionProcessor:
@@ -68,7 +68,7 @@ class CorrectionProcessor:
     def overlay_mask(
         self,
         base_img: np.ndarray,
-        mask_img: np.ndarray,
+        mask_img:Union[cv2.typing.MatLike,List[cv2.typing.MatLike]],
         pts1: np.ndarray,
         alpha: float = 1.0,
         color: tuple[int, int, int] = (0, 0, 0),
@@ -77,31 +77,34 @@ class CorrectionProcessor:
         get_rectangle() で得た領域に、マスク画像を射影変換して指定色で重ねる。
 
         :param base_img: 元画像（カラー）
-        :param mask_img: マスク画像（白背景に黒＝マーク部分）
+        :param mask_imgs: マスク画像（0＝マーク部分）
         :param pts1: 実画像上の投影先四角形 (上から時計回りの4点)
         :param alpha: 色の不透明度 (1.0で完全塗りつぶし）
         :param color: 上書きする色 (B, G, R) タプル
         :return: 合成済み画像
         """
+        mask_imgs = mask_img if mask_img is list else [mask_img]
         # マスク画像（rect → 台形）へ投影変換
-        mask_img = cv2.resize(mask_img,(self.rectW,self.rectH))
+        resized_mask_imgs = [cv2.resize(mask_img,(self.rectW,self.rectH)) for mask_img in mask_imgs]
         M = cv2.getPerspectiveTransform(self.pts2, pts1)
-        warped_mask = cv2.warpPerspective(mask_img, M, (base_img.shape[1], base_img.shape[0]))
-
+        warped_mask = [cv2.warpPerspective(resized_mask_img, M, (base_img.shape[1], base_img.shape[0])) for resized_mask_img in resized_mask_imgs]
+        combined_mask = np.sum(warped_mask,axis=0)
+        #cv2.imshow("warped mask",combined_mask)
         # 重ねる対象領域（マスクが黒の部分）
-        mask_area = warped_mask == 0
+        mask_area = combined_mask == 0
 
+        result_img = base_img.copy()
         # 対象ピクセルだけ色を変更
         if alpha >= 1.0:
-            base_img[mask_area] = color
+            result_img[mask_area] = color
         else:
-            base_img[mask_area] = (
-                base_img[mask_area].astype(np.float32) * (1 - alpha)
+            result_img[mask_area] = (
+                result_img[mask_area].astype(np.float32) * (1 - alpha)
                 + np.array(color, dtype=np.float32) * alpha
             ).astype(np.uint8)
 
-        return base_img
-
+        return result_img
+    
 @dataclasses.dataclass(frozen=True)
 class Margin:
     """各マークの上下左右にある余白を表すデータクラス"""
