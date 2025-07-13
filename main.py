@@ -4,6 +4,7 @@ from network.data.data_decoder import DecodedData
 from network.data.image_data import IMAGE_DATA_TYPE, ImageDataDecoder
 from step.initial_step import InitialStepFactory
 from step.ssq_step import SSQStepFactory
+from step.mssq_step import MSSQStepFactory
 from step.unity_step import UnityStepFactory
 from PIL import ExifTags
 import queue
@@ -58,12 +59,15 @@ def main(working_dir: Path):
     data_container = {}
 
     name_step_factory = InitialStepFactory(data_container)
+    mssq_factory = MSSQStepFactory(working_dir,data_container,q)
     before_ssq_factory = SSQStepFactory(working_dir, data_container, q, "before")
     unity_step_factory = UnityStepFactory(data_container)
     after_ssq_factory = SSQStepFactory(working_dir, data_container, q, "after")
     factories = [
         name_step_factory.create,
         before_ssq_factory.create,
+        mssq_factory.create,
+        
         unity_step_factory.create,
         after_ssq_factory.create,
     ]
