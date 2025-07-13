@@ -162,7 +162,7 @@ class MSSQImageProcessor:
         marked = [[answer] if answer != -1 else [] for answer in answers ]
         mask = self.markseat_reader.create_mask(marked[:size])
         mask2 = self.markseat_reader2.create_mask(marked[size:])
-        masked = self.correction_processor.overlay_mask(opencv_image,rect,0.5,mask,mask2)
+        masked = self.correction_processor.overlay_mask(opencv_image,[mask,mask2],rect,0.5,)
         new_image = cv2.cvtColor(masked, cv2.COLOR_BGR2RGB)
         new_image = Image.fromarray(new_image)
         return new_image

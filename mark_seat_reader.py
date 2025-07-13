@@ -83,15 +83,17 @@ class CorrectionProcessor:
         :param color: 上書きする色 (B, G, R) タプル
         :return: 合成済み画像
         """
-        mask_imgs = mask_img if mask_img is list else [mask_img]
+        mask_imgs = mask_img if isinstance(mask_img,list) else [mask_img]
+        cv2.imshow("window0",cv2.resize(mask_imgs[0],(0,0),fx=0.5,fy=0.5))
         # マスク画像（rect → 台形）へ投影変換
         resized_mask_imgs = [cv2.resize(mask_img,(self.rectW,self.rectH)) for mask_img in mask_imgs]
         M = cv2.getPerspectiveTransform(self.pts2, pts1)
-        warped_mask = [cv2.warpPerspective(resized_mask_img, M, (base_img.shape[1], base_img.shape[0])) for resized_mask_img in resized_mask_imgs]
-        combined_mask = np.sum(warped_mask,axis=0)
-        #cv2.imshow("warped mask",combined_mask)
-        # 重ねる対象領域（マスクが黒の部分）
-        mask_area = combined_mask == 0
+        warped_mask = [cv2.warpPerspective(resized_mask_img, M, (base_img.shape[1], base_img.shape[0]),borderValue=1) for resized_mask_img in resized_mask_imgs]
+        warped_mask_array = np.stack(warped_mask)
+        combined_mask = np.any(warped_mask_array, axis=0)
+        cv2.imshow("window",cv2.resize(combined_mask.astype(np.uint8)*255,(0,0),fx=0.5,fy=0.5))
+        # 重ねる対象領域（マスクが白の部分）
+        mask_area = combined_mask == 1
 
         result_img = base_img.copy()
         # 対象ピクセルだけ色を変更
@@ -153,8 +155,8 @@ class MarkseatReader:
         cell_width, cell_height = self._calculate_cell_size()
         width = self.offset_left + self.col * cell_width + self.offset_right
         height = self.offset_top + self.row * cell_height + self.offset_bottom
-        mask = np.ones((height,width), dtype=np.uint8) * 255  # 白背景
-        drawn = self._draw_cells(mask, marked, thickness=-1)
+        mask = np.zeros((height,width), dtype=np.uint8)   # 黒背景
+        drawn = self._draw_cells(mask, marked, thickness=-1,color=1)
         return drawn
 
     def highlight_all_cells(self, src: np.ndarray) -> np.ndarray:
@@ -165,7 +167,7 @@ class MarkseatReader:
         :return: 枠線付き画像
         """
         marked = [[i for i in range(self.col)] for _ in range(self.row)]
-        return self._draw_cells(src, marked, thickness=2)
+        return self._draw_cells(src, marked, thickness=2,color=1)
 
     def fill_marked_cells(self, src: np.ndarray, marked: list[list[int]]) -> np.ndarray:
         """
@@ -178,7 +180,7 @@ class MarkseatReader:
         return self._draw_cells(src, marked, thickness=-1)
 
     def _draw_cells(
-        self, src: np.ndarray, marked: list[list[int]], thickness: int
+        self, src: np.ndarray, marked: list[list[int]], thickness: int,color=0
     ) -> np.ndarray:
         """
         指定されたセルに矩形を描画する共通処理
@@ -194,7 +196,7 @@ class MarkseatReader:
                 top_left = self._get_cell_position(row_index, col_index)
                 bottom_right = (top_left[0] + self.cell_width, top_left[1] + self.cell_height)
                 cv2.rectangle(
-                    resized, top_left, bottom_right, color=0, thickness=thickness
+                    resized, top_left, bottom_right, color=color, thickness=thickness
                 )
 
         return cv2.resize(resized, src.shape[::-1])
