@@ -180,6 +180,14 @@ class UnityStepController:
         print(f"receive: {msg}")
 
     def dispose(self):
+        self.unity_client.on_receive = None
+        self.unity_client.on_connected = None
+        self.unity_client.on_disconnected = None
+
+        self.arduino_client.on_receive = None
+        self.arduino_client.on_connected = None
+        self.arduino_client.on_disconnected = None
+
         self.unity_client.disconnect()
         self.arduino_client.disconnect()
 
