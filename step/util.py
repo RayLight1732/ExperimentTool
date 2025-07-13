@@ -1,11 +1,14 @@
 from pathlib import Path
 from typing import Optional
 
+def get_name(data_container):
+    return data_container["name"]
+
 def get_save_dir(working_dir: Path, data_container):
     condition = data_container["condition"]
     mode = get_mode(condition)
     position = get_mode(condition)
-    return working_dir / mode / position / data_container["name"]
+    return working_dir / mode / position / get_name(data_container)
 
 
 def get_file_name(data_container):
