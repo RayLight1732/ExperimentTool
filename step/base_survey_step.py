@@ -69,7 +69,7 @@ class BaseStepUI:
                         command=on_radio_update,
                     ).grid(row=row, column=col + 1, sticky="w", padx=5, pady=5)
 
-    def update_canvas(self, pil_image: Optional[Image.Image]):
+    def update_canvas(self, pil_image: Optional[Image.Image]): 
         self.canvas.delete("all")
         if pil_image is None:
             self.canvas.create_text(
@@ -80,16 +80,17 @@ class BaseStepUI:
                 font=("Arial", 14),
             )
             return
-
-        img_ratio = pil_image.width / pil_image.height
+        
         canvas_ratio = self.canvas.winfo_width() / self.canvas.winfo_height()
+        img_ratio = pil_image.width / pil_image.height
         if canvas_ratio > img_ratio:
             height = self.canvas.winfo_height()
             width = int(height * img_ratio)
         else:
             width = self.canvas.winfo_width()
             height = int(width / img_ratio)
-
+        if width <= 0 or height <= 0:
+            return
         resized = pil_image.resize((width, height))
         self.tk_image = PIL.ImageTk.PhotoImage(resized)
         x = (self.canvas.winfo_width() - width) // 2
