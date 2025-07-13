@@ -21,7 +21,7 @@ class MSSQImageProcessor(BaseImageProcessor):
         self,
         correction_processor: CorrectionProcessor,
         reader1: MarkseatReader,
-        upper_row_count:int,
+        upper_row_count: int,
         reader2: MarkseatReader,
     ):
         self.correction_processor = correction_processor
@@ -47,8 +47,8 @@ class MSSQImageProcessor(BaseImageProcessor):
         self, image: Image.Image, rect, answers: list[int]
     ) -> Image.Image:
         opencv_image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
-        marked1 = [[a] if a != -1 else [] for a in answers[:self.upper_row_count]]
-        marked2 = [[a] if a != -1 else [] for a in answers[self.upper_row_count:]]
+        marked1 = [[a] if a != -1 else [] for a in answers[: self.upper_row_count]]
+        marked2 = [[a] if a != -1 else [] for a in answers[self.upper_row_count :]]
         mask1 = self.reader1.create_mask(marked1)
         mask2 = self.reader2.create_mask(marked2)
         overlayed = self.correction_processor.overlay_mask(
@@ -91,7 +91,8 @@ class MSSQStepFactory:
             cell_height=60,
             cell_margin=margin,
         )
-        processor = MSSQImageProcessor(CorrectionProcessor(1075, 860), reader1,8, reader2)
+        correction_processor = CorrectionProcessor(1075, 860, [4, 5, 7, 6])
+        processor = MSSQImageProcessor(correction_processor, reader1, 8, reader2)
         save_dir = self.working_dir / sutil.get_name(self.data_container)
         file_name = "MSSQ"
         ui = BaseStepUI(

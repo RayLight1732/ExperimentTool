@@ -11,5 +11,5 @@ def arGenerator(id: int, size: int):
 
 
 if __name__ == "__main__":
-    for i in range(4):
+    for i in range(8):
         arGenerator(i, 150)
