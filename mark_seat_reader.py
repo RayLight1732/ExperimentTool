@@ -77,7 +77,7 @@ class CorrectionProcessor:
         get_rectangle() で得た領域に、マスク画像を射影変換して指定色で重ねる。
 
         :param base_img: 元画像（カラー）
-        :param mask_imgs: マスク画像（0＝マーク部分）
+        :param mask_imgs: マスク画像(0=マーク部分)
         :param pts1: 実画像上の投影先四角形 (上から時計回りの4点)
         :param alpha: 色の不透明度 (1.0で完全塗りつぶし）
         :param color: 上書きする色 (B, G, R) タプル
