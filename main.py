@@ -60,14 +60,13 @@ def main(working_dir: Path):
 
     name_step_factory = InitialStepFactory(data_container)
     mssq_factory = MSSQStepFactory(working_dir,data_container,q)
-    before_ssq_factory = SSQStepFactory(working_dir, data_container, q, "before")
+    before_ssq_factory = SSQStepFactory(working_dir, data_container, q, "SSQ","before")
     unity_step_factory = UnityStepFactory(data_container)
-    after_ssq_factory = SSQStepFactory(working_dir, data_container, q, "after")
+    after_ssq_factory = SSQStepFactory(working_dir, data_container, q, "SSQ","after")
     factories = [
         name_step_factory.create,
-        before_ssq_factory.create,
         mssq_factory.create,
-        
+        before_ssq_factory.create,
         unity_step_factory.create,
         after_ssq_factory.create,
     ]
