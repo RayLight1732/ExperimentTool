@@ -84,14 +84,12 @@ class CorrectionProcessor:
         :return: 合成済み画像
         """
         mask_imgs = mask_img if isinstance(mask_img,list) else [mask_img]
-        cv2.imshow("window0",cv2.resize(mask_imgs[0],(0,0),fx=0.5,fy=0.5))
         # マスク画像（rect → 台形）へ投影変換
         resized_mask_imgs = [cv2.resize(mask_img,(self.rectW,self.rectH)) for mask_img in mask_imgs]
         M = cv2.getPerspectiveTransform(self.pts2, pts1)
         warped_mask = [cv2.warpPerspective(resized_mask_img, M, (base_img.shape[1], base_img.shape[0]),borderValue=1) for resized_mask_img in resized_mask_imgs]
         warped_mask_array = np.stack(warped_mask)
         combined_mask = np.any(warped_mask_array, axis=0)
-        cv2.imshow("window",cv2.resize(combined_mask.astype(np.uint8)*255,(0,0),fx=0.5,fy=0.5))
         # 重ねる対象領域（マスクが白の部分）
         mask_area = combined_mask == 1
 
