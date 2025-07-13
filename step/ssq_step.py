@@ -233,7 +233,7 @@ class SSQStepFactory:
         self.queue = queue
 
     def create(self, frame: ttk.Frame, set_complete: Callable[[bool], None]) -> Step:
-        rect_margin = Margin(230, 1110, 0, 10)
+        rect_margin = Margin(285, 1110, 0, 60)
         margin = Margin(15, 75, 75, 15)
         markseat_reader = MarkseatReader(
             rect_margin=rect_margin,
