@@ -53,6 +53,7 @@ class FileMoveStep(Step):
 
     def build(self):
         self.ui.show_waiting()
+        self._update()
 
     def _update(self):
         if not self.processor.move_file():
