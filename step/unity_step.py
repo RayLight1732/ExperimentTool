@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import ttk
 from typing import Callable
 from step.step import Step
+import step.util as sutil
 from network.data.multi_type_data_decoder import MultiTypeDataDecoder
 from network.data.string_data import STRING_DATA_TYPE, StringDataDecoder, StringData
 from network.tcp_client import TCPClient
@@ -10,8 +11,10 @@ from network.simple_serial import ArduinoSerial
 
 
 class UnityStepUI:
-    def __init__(self, container: ttk.Frame,default_ip:str="",default_port=51234):
+    def __init__(self, container: ttk.Frame,position:str,mode:str,default_ip:str="",default_port=51234):
         self.container = container
+        self.position = position
+        self.mode = mode
         self.default_ip=default_ip
         self.default_port = default_port
         self.ip_entry = None
@@ -22,6 +25,7 @@ class UnityStepUI:
         self.started_text = None
 
     def build(self, on_connect_unity, on_connect_arduino, on_start):
+        ttk.Label(self.container,text=f"{self.mode} {self.position}").pack(side="top")
         ttk.Label(self.container, text="IPアドレス").pack(side="top")
 
         self.ip_var = tk.StringVar()
@@ -133,6 +137,7 @@ class UnityStepController:
 
     def connect_arduino(self):
         if not self.arduino_client.connected:
+            print(self.arduino_client.list_ports())
             self.arduino_client.connect()
 
     def can_start(self):
@@ -258,11 +263,14 @@ class UnityStepFactory:
 
     def create(self, frame: ttk.Frame, set_complete: Callable[[bool], None]) -> Step:
         condition = self.data_container["condition"]
-        ip = self.data_container.get("ip","127.0.0.1")
+        ip = self.data_container.get("ip","10.226.46.173")
         port = self.data_container.get("port",51234)
-        ui = UnityStepUI(frame,ip,port)
+        mode = sutil.get_mode(condition)
+        position = sutil.get_postion(condition)
+        ui = UnityStepUI(frame,position,mode,ip,port)
         decoder = MultiTypeDataDecoder({STRING_DATA_TYPE: StringDataDecoder()})
         unity_client = TCPClient(decoder)
         arduino_client = ArduinoSerial(port="COM3")
         controller = UnityStepController(unity_client, arduino_client, condition)
+        
         return UnityStep(set_complete, ui, controller,self.save_ip_port)

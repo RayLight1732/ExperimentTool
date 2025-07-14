@@ -41,10 +41,11 @@ def get_mode_number(mode:Optional[str])->int:
 POSITION_NONE = 0
 MODE_NEVER = 0
 def calc_condition(mode:int,position:int)->int:
-    return (mode << 2 & 0b00001100) + (position & 0b00000011)
+    print(f"calc condition:{mode} {position}")
+    return (position << 2 & 0b00001100) + (mode & 0b00000011)
 
 def get_mode(condition:int) ->str:
-    return MODE[condition >> 2 & 0b00000011]
+    return MODE[condition  & 0b00000011]
 
 def get_postion(condition:int)->str:
-    return POSITIONS[condition & 0b00000011]
+    return POSITIONS[condition >> 2 & 0b00000011]

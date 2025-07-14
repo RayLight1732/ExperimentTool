@@ -95,10 +95,8 @@ class MSSQStepFactory:
         )
         correction_processor = CorrectionProcessor(1075, 860, [4, 5, 7, 6])
         processor = MSSQImageProcessor(correction_processor, reader1, 8, reader2)
-        save_dir = self.working_dir / "MSSQ" / sutil.get_name(self.data_container)
-        file_name = (
-            f"{self.file_name_prefix}_{sutil.get_timestamp(self.data_container)}_{self.file_name_suffix}"
-        )
+        save_dir = self.working_dir / "MSSQ"
+        file_name = sutil.get_name(self.data_container)
         ui = BaseStepUI(
             frame,
             sections=[("12歳以前", 8, 5), ("直近10年", 8, 5)],
