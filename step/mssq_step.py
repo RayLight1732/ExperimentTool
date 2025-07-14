@@ -63,12 +63,14 @@ class MSSQStepFactory:
         working_dir: Path,
         data_container,
         queue: Queue,
-        file_name_prefix: str = "",
+        file_name_prefix: str = "MSSQ",
+        file_name_suffix:str = ""
     ):
         self.working_dir = working_dir
         self.data_container = data_container
         self.queue = queue
         self.file_name_prefix = file_name_prefix
+        self.file_name_suffix = file_name_suffix
 
     def create(self, frame, set_complete: Callable[[bool], None]) -> BaseSurveyStep:
         margin = Margin(15, 75, 75, 15)
@@ -94,7 +96,9 @@ class MSSQStepFactory:
         correction_processor = CorrectionProcessor(1075, 860, [4, 5, 7, 6])
         processor = MSSQImageProcessor(correction_processor, reader1, 8, reader2)
         save_dir = self.working_dir / "MSSQ" / sutil.get_name(self.data_container)
-        file_name = "MSSQ"
+        file_name = (
+            f"{self.file_name_prefix}_{sutil.get_timestamp(self.data_container)}_{self.file_name_suffix}"
+        )
         ui = BaseStepUI(
             frame,
             sections=[("12歳以前", 8, 5), ("直近10年", 8, 5)],

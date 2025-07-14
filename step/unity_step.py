@@ -10,8 +10,10 @@ from network.simple_serial import ArduinoSerial
 
 
 class UnityStepUI:
-    def __init__(self, container: ttk.Frame):
+    def __init__(self, container: ttk.Frame,default_ip:str="",default_port=51234):
         self.container = container
+        self.default_ip=default_ip
+        self.default_port = default_port
         self.ip_entry = None
         self.port_entry = None
         self.connect_button = None
@@ -60,8 +62,8 @@ class UnityStepUI:
         )
         self.start_button.pack(side="top")
 
-        self.ip_entry.insert(0, "127.0.0.1")
-        self.port_entry.insert(0, "51234")
+        self.ip_entry.insert(0, self.default_ip)
+        self.port_entry.insert(0, str(self.default_port))
 
     def _validate_port_entry(self, new_value):
         return new_value == "" or new_value.isdigit()
@@ -198,10 +200,12 @@ class UnityStep(Step):
         set_complete: Callable[[bool], None],
         step_ui: UnityStepUI,
         controller: UnityStepController,
+        save_ip_port:Callable[[str,int],None]
     ):
         self.ui = step_ui
         self.controller = controller
         self.set_complete = set_complete
+        self.save_ip_port = save_ip_port
 
         self.controller.on_started = self.ui.show_started
         self.controller.on_finished = self._on_finished
@@ -217,6 +221,8 @@ class UnityStep(Step):
     def _connect_unity(self):
         ip = self.ui.get_ip()
         port = self.ui.get_port()
+        print(f"connect unity: {ip}:{port}")
+        self.save_ip_port(ip,port)
         self.controller.connect_unity(ip, port)
 
     def _connect_arduino(self):
@@ -246,11 +252,17 @@ class UnityStepFactory:
     def __init__(self, data_container: dict):
         self.data_container = data_container
 
+    def save_ip_port(self,ip:str,port:int):
+        self.data_container["ip"] = ip
+        self.data_container["port"] = port
+
     def create(self, frame: ttk.Frame, set_complete: Callable[[bool], None]) -> Step:
         condition = self.data_container["condition"]
-        ui = UnityStepUI(frame)
+        ip = self.data_container.get("ip","127.0.0.1")
+        port = self.data_container.get("port",51234)
+        ui = UnityStepUI(frame,ip,port)
         decoder = MultiTypeDataDecoder({STRING_DATA_TYPE: StringDataDecoder()})
         unity_client = TCPClient(decoder)
         arduino_client = ArduinoSerial(port="COM3")
         controller = UnityStepController(unity_client, arduino_client, condition)
-        return UnityStep(set_complete, ui, controller)
+        return UnityStep(set_complete, ui, controller,self.save_ip_port)
