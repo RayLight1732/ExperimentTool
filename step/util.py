@@ -7,7 +7,7 @@ def get_name(data_container):
 def get_save_dir(working_dir: Path, data_container):
     condition = data_container["condition"]
     mode = get_mode(condition)
-    position = get_mode(condition)
+    position = get_position(condition)
     return working_dir / mode / position / get_name(data_container)
 
 
@@ -47,5 +47,5 @@ def calc_condition(mode:int,position:int)->int:
 def get_mode(condition:int) ->str:
     return MODE[condition  & 0b00000011]
 
-def get_postion(condition:int)->str:
+def get_position(condition:int)->str:
     return POSITIONS[condition >> 2 & 0b00000011]
