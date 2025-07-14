@@ -2,7 +2,7 @@ import cv2
 from cv2 import aruco
 import numpy as np
 import dataclasses
-from typing import Tuple,Optional,Union,List
+from typing import Tuple, Optional, Union, List
 
 
 class CorrectionProcessor:
@@ -33,7 +33,7 @@ class CorrectionProcessor:
         """
 
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)  # グレースケールにする
-     
+
         corners, ids, _ = aruco.detectMarkers(
             gray, self.dic_aruco
         )  # マーカー検出 corners(N,1,4,2) ids(N,1)
@@ -54,21 +54,23 @@ class CorrectionProcessor:
         else:
             return None
 
-    def correct(self, frame)->Union[Tuple[cv2.typing.MatLike,np.ndarray],Tuple[None,None]]:
+    def correct(
+        self, frame
+    ) -> Union[Tuple[cv2.typing.MatLike, np.ndarray], Tuple[None, None]]:
         pts1 = self.get_rectangle(frame)
         if pts1 is not None:
             M = cv2.getPerspectiveTransform(pts1, self.pts2)  # 投影行列
             rect = cv2.warpPerspective(
                 frame, M, (self.rectW, self.rectH)
             )  # 長方形画像を得る
-            return rect,pts1
+            return rect, pts1
         else:
-            return None,None
-            
+            return None, None
+
     def overlay_mask(
         self,
         base_img: np.ndarray,
-        mask_img:Union[cv2.typing.MatLike,List[cv2.typing.MatLike]],
+        mask_img: Union[cv2.typing.MatLike, List[cv2.typing.MatLike]],
         pts1: np.ndarray,
         alpha: float = 1.0,
         color: tuple[int, int, int] = (0, 0, 0),
@@ -83,11 +85,21 @@ class CorrectionProcessor:
         :param color: 上書きする色 (B, G, R) タプル
         :return: 合成済み画像
         """
-        mask_imgs = mask_img if isinstance(mask_img,list) else [mask_img]
+        mask_imgs = mask_img if isinstance(mask_img, list) else [mask_img]
         # マスク画像（rect → 台形）へ投影変換
-        resized_mask_imgs = [cv2.resize(mask_img,(self.rectW,self.rectH)) for mask_img in mask_imgs]
+        resized_mask_imgs = [
+            cv2.resize(mask_img, (self.rectW, self.rectH)) for mask_img in mask_imgs
+        ]
         M = cv2.getPerspectiveTransform(self.pts2, pts1)
-        warped_mask = [cv2.warpPerspective(resized_mask_img, M, (base_img.shape[1], base_img.shape[0]),borderValue=1) for resized_mask_img in resized_mask_imgs]
+        warped_mask = [
+            cv2.warpPerspective(
+                resized_mask_img,
+                M,
+                (base_img.shape[1], base_img.shape[0]),
+                borderValue=1,
+            )
+            for resized_mask_img in resized_mask_imgs
+        ]
         warped_mask_array = np.stack(warped_mask)
         combined_mask = np.any(warped_mask_array, axis=0)
         # 重ねる対象領域（マスクが白の部分）
@@ -104,7 +116,8 @@ class CorrectionProcessor:
             ).astype(np.uint8)
 
         return result_img
-    
+
+
 @dataclasses.dataclass(frozen=True)
 class Margin:
     """各マークの上下左右にある余白を表すデータクラス"""
@@ -149,12 +162,12 @@ class MarkseatReader:
         binary = self._binarize_image(region)
         return [self._analyze_row(binary, r) for r in range(self.row)]
 
-    def create_mask(self,marked: list[list[int]]):
+    def create_mask(self, marked: list[list[int]]):
         cell_width, cell_height = self._calculate_cell_size()
         width = self.offset_left + self.col * cell_width + self.offset_right
         height = self.offset_top + self.row * cell_height + self.offset_bottom
-        mask = np.zeros((height,width), dtype=np.uint8)   # 黒背景
-        drawn = self._draw_cells(mask, marked, thickness=-1,color=1)
+        mask = np.zeros((height, width), dtype=np.uint8)  # 黒背景
+        drawn = self._draw_cells(mask, marked, thickness=-1, color=1)
         return drawn
 
     def highlight_all_cells(self, src: np.ndarray) -> np.ndarray:
@@ -165,7 +178,7 @@ class MarkseatReader:
         :return: 枠線付き画像
         """
         marked = [[i for i in range(self.col)] for _ in range(self.row)]
-        return self._draw_cells(src, marked, thickness=2,color=1)
+        return self._draw_cells(src, marked, thickness=2, color=1)
 
     def fill_marked_cells(self, src: np.ndarray, marked: list[list[int]]) -> np.ndarray:
         """
@@ -178,7 +191,7 @@ class MarkseatReader:
         return self._draw_cells(src, marked, thickness=-1)
 
     def _draw_cells(
-        self, src: np.ndarray, marked: list[list[int]], thickness: int,color=0
+        self, src: np.ndarray, marked: list[list[int]], thickness: int, color=0
     ) -> np.ndarray:
         """
         指定されたセルに矩形を描画する共通処理
@@ -192,7 +205,10 @@ class MarkseatReader:
         for row_index, col_indices in enumerate(marked):
             for col_index in col_indices:
                 top_left = self._get_cell_position(row_index, col_index)
-                bottom_right = (top_left[0] + self.cell_width, top_left[1] + self.cell_height)
+                bottom_right = (
+                    top_left[0] + self.cell_width,
+                    top_left[1] + self.cell_height,
+                )
                 cv2.rectangle(
                     resized, top_left, bottom_right, color=color, thickness=thickness
                 )
@@ -271,10 +287,14 @@ class MarkseatReader:
         セルサイズ（余白込み）を返す
         """
         cell_width = (
-            self.cell_margin.margin_left + self.cell_width + self.cell_margin.margin_right
+            self.cell_margin.margin_left
+            + self.cell_width
+            + self.cell_margin.margin_right
         )
         cell_height = (
-            self.cell_margin.margin_top + self.cell_height + self.cell_margin.margin_bottom
+            self.cell_margin.margin_top
+            + self.cell_height
+            + self.cell_margin.margin_bottom
         )
         return cell_width, cell_height
 
@@ -303,7 +323,7 @@ def main():
     # 80 20
     processor = CorrectionProcessor(1000, 900)
     img = cv2.imread("c:\\Users\\arusu\\Downloads\\DSC_1158.jpg")
-    corrected,rect = processor.correct(img)
+    corrected, rect = processor.correct(img)
     gray = cv2.cvtColor(corrected, cv2.COLOR_BGR2GRAY)
     rect_margin = Margin(230, 1110, 0, 10)
     margin = Margin(15, 75, 75, 15)
@@ -321,8 +341,8 @@ def main():
         print(r)
 
     mask = reader.create_mask(result)
-    draw = processor.overlay_mask(img,mask,rect,0.5)
-    cv2.imshow("result", cv2.resize(draw,(400,500)))
+    draw = processor.overlay_mask(img, mask, rect, 0.5)
+    cv2.imshow("result", cv2.resize(draw, (400, 500)))
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
