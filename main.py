@@ -6,6 +6,8 @@ from step.initial_step import InitialStepFactory
 from step.ssq_step import SSQStepFactory
 from step.mssq_step import MSSQStepFactory
 from step.unity_step import UnityStepFactory
+from step.vection_survey_step import VectionSurveyStepFactory
+from step.file_move_step import FileMoveStepFactory
 from PIL import ExifTags
 import queue
 import ctypes
@@ -41,7 +43,7 @@ def on_receive(queue: queue.Queue, decodedData: DecodedData):
 # ---------------------
 # main
 # ---------------------
-def main(working_dir: Path):
+def main(working_dir: Path, bb_dir: Path):
     decoder = ImageDataDecoder()
     q = queue.Queue(0)
     server = TCPServer(decoder, lambda data: on_receive(q, data), port=51234)
@@ -59,15 +61,19 @@ def main(working_dir: Path):
     data_container = {}
 
     name_step_factory = InitialStepFactory(data_container)
-    mssq_factory = MSSQStepFactory(working_dir,data_container,q)
-    before_ssq_factory = SSQStepFactory(working_dir, data_container, q, "SSQ","before")
+    mssq_factory = MSSQStepFactory(working_dir, data_container, q)
+    before_ssq_factory = SSQStepFactory(working_dir, data_container, q, "SSQ", "before")
     unity_step_factory = UnityStepFactory(data_container)
-    after_ssq_factory = SSQStepFactory(working_dir, data_container, q, "SSQ","after")
+    file_move_step_factory = FileMoveStepFactory(bb_dir, working_dir, data_container)
+    vection_survey_step_factory = VectionSurveyStepFactory(working_dir, data_container)
+    after_ssq_factory = SSQStepFactory(working_dir, data_container, q, "SSQ", "after")
     factories = [
         name_step_factory.create,
         mssq_factory.create,
         before_ssq_factory.create,
         unity_step_factory.create,
+        file_move_step_factory.create,
+        vection_survey_step_factory.create,
         after_ssq_factory.create,
     ]
 
@@ -102,4 +108,5 @@ if __name__ == "__main__":
 
     # working_dir を取得
     working_dir = config.get("working_dir")
-    main(Path(working_dir))
+    bb_dir = config.get("bb_dir")
+    main(Path(working_dir), Path(bb_dir))
