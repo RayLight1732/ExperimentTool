@@ -266,7 +266,7 @@ class UnityStepFactory:
         ip = self.data_container.get("ip","10.226.46.173")
         port = self.data_container.get("port",51234)
         mode = sutil.get_mode(condition)
-        position = sutil.get_postion(condition)
+        position = sutil.get_position(condition)
         ui = UnityStepUI(frame,position,mode,ip,port)
         decoder = MultiTypeDataDecoder({STRING_DATA_TYPE: StringDataDecoder()})
         unity_client = TCPClient(decoder)
