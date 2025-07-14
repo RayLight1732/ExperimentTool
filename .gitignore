@@ -209,4 +209,4 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-settings.yaml
+/settings.yaml
