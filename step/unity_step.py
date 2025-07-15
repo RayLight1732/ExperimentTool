@@ -8,6 +8,8 @@ from network.data.string_data import STRING_DATA_TYPE, StringDataDecoder, String
 from network.tcp_client import TCPClient
 from network.data.data_decoder import DecodedData
 from network.simple_serial import ArduinoSerial
+from pathlib import Path
+import simpleaudio as sa
 
 
 class UnityStepUI:
@@ -198,6 +200,29 @@ class UnityStepController:
         self.unity_client.disconnect()
         self.arduino_client.disconnect()
 
+class SoundPlayer:
+    def __init__(self,sound_path:Path):
+        self.sound_path = sound_path
+        self.play = False
+        self.wave_obj = sa.WaveObject.from_wave_file(str(sound_path))
+        self.play_obj:sa.PlayObject = None
+
+    def set_state(self,play:bool):
+        self.play = play
+        self.update()
+    
+    def update(self):
+        if self.play:
+            if self.play_obj is not None and self.play_obj.is_playing():
+                #再生中なら何もしない
+                return
+            else:
+                self.play_obj = self.wave_obj.play()
+        else:
+            if self.play_obj is not None:
+                self.play_obj.stop()
+                self.play_obj = None
+
 
 class UnityStep(Step):
     def __init__(
@@ -205,14 +230,16 @@ class UnityStep(Step):
         set_complete: Callable[[bool], None],
         step_ui: UnityStepUI,
         controller: UnityStepController,
-        save_ip_port:Callable[[str,int],None]
+        save_ip_port:Callable[[str,int],None],
+        sound_player:SoundPlayer
     ):
         self.ui = step_ui
         self.controller = controller
         self.set_complete = set_complete
         self.save_ip_port = save_ip_port
+        self.sound_player = sound_player
 
-        self.controller.on_started = self.ui.show_started
+        self.controller.on_started = self._on_started
         self.controller.on_finished = self._on_finished
         self.controller.on_status_change = self._update_status
 
@@ -237,6 +264,11 @@ class UnityStep(Step):
         self.controller.start()
         self.ui.destroy_start_button()
 
+    def _on_started(self):
+        self.ui.show_started
+        self.sound_player.set_state(True)
+
+
     def _update_status(self):
         self.ui.set_unity_status(self.controller.unity_client.connected)
         self.ui.set_arduino_status(self.controller.arduino_client.connected)
@@ -244,18 +276,21 @@ class UnityStep(Step):
 
     def _on_finished(self):
         self.ui.show_finished()
+        self.sound_player.set_state(False)
         self.set_complete(True)
 
     def on_dispose(self):
         self.controller.dispose()
+        self.sound_player.set_state(False)
 
     def before_next(self):
         pass
 
 
 class UnityStepFactory:
-    def __init__(self, data_container: dict):
+    def __init__(self, data_container: dict,sound_path:Path):
         self.data_container = data_container
+        self.sound_path = sound_path
 
     def save_ip_port(self,ip:str,port:int):
         self.data_container["ip"] = ip
@@ -272,5 +307,5 @@ class UnityStepFactory:
         unity_client = TCPClient(decoder)
         arduino_client = ArduinoSerial(port="COM3")
         controller = UnityStepController(unity_client, arduino_client, condition)
-        
-        return UnityStep(set_complete, ui, controller,self.save_ip_port)
+        sound_player = SoundPlayer(self.sound_path)
+        return UnityStep(set_complete, ui, controller,self.save_ip_port,sound_player)

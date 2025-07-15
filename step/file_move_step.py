@@ -32,8 +32,11 @@ class FileMoveProcessor:
         self.dst_folder.mkdir(parents=True, exist_ok=True)
         count = 0
         for csv_file in self.src_folder.glob(self.pattern):
-            count += 1
-            shutil.move(str(csv_file), str(self.dst_folder / csv_file.name))
+            try:
+                shutil.move(str(csv_file), str(self.dst_folder / csv_file.name))
+                count += 1
+            except:
+                pass
         return count > 0
 
 
