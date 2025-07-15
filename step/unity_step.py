@@ -13,7 +13,7 @@ import simpleaudio as sa
 
 
 class UnityStepUI:
-    def __init__(self, container: ttk.Frame,position:str,mode:str,default_ip:str="",default_port=51234):
+    def __init__(self, container: ttk.Frame,position:str,mode:str,default_ip:str="",default_port=51234,checklist:list[str]=[]):
         self.container = container
         self.position = position
         self.mode = mode
@@ -25,8 +25,10 @@ class UnityStepUI:
         self.arduino_connect_button = None
         self.start_button = None
         self.started_text = None
+        self.checklist = checklist
+        self.check_vars = []
 
-    def build(self, on_connect_unity, on_connect_arduino, on_start):
+    def build(self, on_connect_unity, on_connect_arduino, on_start,on_reset_pose):
         ttk.Label(self.container,text=f"{self.mode} {self.position}").pack(side="top")
         ttk.Label(self.container, text="IPアドレス").pack(side="top")
 
@@ -63,6 +65,10 @@ class UnityStepUI:
         )
         self.arduino_connect_button.pack(side="top")
 
+        self.reset_pose_button = ttk.Button(
+            self.container, text="ポーズリセット", state="disabled", command=on_reset_pose
+        )
+        self.reset_pose_button.pack(side="top")
         self.start_button = ttk.Button(
             self.container, text="開始", state="disabled", command=on_start
         )
@@ -70,6 +76,13 @@ class UnityStepUI:
 
         self.ip_entry.insert(0, self.default_ip)
         self.port_entry.insert(0, str(self.default_port))
+
+        self.check_vars = []
+        for check_item in self.checklist:
+            check_var = tk.BooleanVar()
+            chk = ttk.Checkbutton(self.container, text=check_item, variable=check_var)
+            chk.pack(side="bottom",pady=4)
+            self.check_vars.append(check_var)
 
     def _validate_port_entry(self, new_value):
         return new_value == "" or new_value.isdigit()
@@ -99,6 +112,9 @@ class UnityStepUI:
     def set_start_button_enabled(self, enabled: bool):
         self.start_button["state"] = "normal" if enabled else "disabled"
 
+    def set_reset_pose_button_enabled(self,enabled:bool):
+        self.reset_pose_button["state"] = "normal" if enabled else "disabled"
+
     def show_started(self):
         if self.started_text is None:
             self.started_text = tk.Label(self.container, text="実験中")
@@ -111,7 +127,10 @@ class UnityStepUI:
 
     def destroy_start_button(self):
         self.start_button.destroy()
+        self.reset_pose_button.destroy()
 
+    def is_check_list_filled(self)->bool:
+        return all(var.get() for var in self.check_vars)
 
 class UnityStepController:
     def __init__(
@@ -149,6 +168,10 @@ class UnityStepController:
         self.arduino_client.send("start")
         # TODO MultiType dataに変更
         self.unity_client.send_data(StringData("start"))
+
+    def reset_pose(self):
+        print("reset")
+        self.unity_client.send_data(StringData("reset"))
 
     def _on_unity_connected(self):
         if self.on_status_change:
@@ -251,6 +274,7 @@ class UnityStep(Step):
             on_connect_unity=self._connect_unity,
             on_connect_arduino=self._connect_arduino,
             on_start=self._start,
+            on_reset_pose=self.controller.reset_pose
         )
         self._update()
 
@@ -276,7 +300,8 @@ class UnityStep(Step):
     def _update_status(self):
         self.ui.set_unity_status(self.controller.unity_client.connected)
         self.ui.set_arduino_status(self.controller.arduino_client.connected)
-        self.ui.set_start_button_enabled(self.controller.can_start())
+        self.ui.set_reset_pose_button_enabled(self.controller.unity_client.connected)
+        self.ui.set_start_button_enabled(self.controller.can_start() and self.ui.is_check_list_filled())
 
     def _on_finished(self):
         self.ui.show_finished()
@@ -312,7 +337,8 @@ class UnityStepFactory:
         port = self.data_container.get("port",51234)
         mode = sutil.get_mode(condition)
         position = sutil.get_position(condition)
-        ui = UnityStepUI(frame,position,mode,ip,port)
+        checklist = ["電源は入っていますか","ヘッドホンは装着されていますか","バランスボードの計測ボタンは押しましたか"]
+        ui = UnityStepUI(frame,position,mode,ip,port,checklist)
         decoder = MultiTypeDataDecoder({STRING_DATA_TYPE: StringDataDecoder()})
         unity_client = TCPClient(decoder)
         arduino_client = ArduinoSerial(port="COM3")
