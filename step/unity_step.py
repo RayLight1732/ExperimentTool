@@ -165,7 +165,6 @@ class UnityStepController:
         return self.arduino_client.connected and self.unity_client.connected
 
     def start(self):
-        self.arduino_client.send("start")
         # TODO MultiType dataに変更
         self.unity_client.send_data(StringData("start"))
 
