@@ -4,15 +4,30 @@ from typing import Optional
 def get_name(data_container):
     return data_container["name"]
 
-def get_save_dir(working_dir: Path, data_container):
+def get_save_dir_from_container(working_dir: Path, data_container:dict):
     condition = data_container["condition"]
+    name = get_name(data_container)
+    return get_save_dir(working_dir,condition,name)
+
+def get_save_dir(working_dir:Path,condition:int,name:str):
     mode = get_mode(condition)
     position = get_position(condition)
-    return working_dir / mode / position / get_name(data_container)
+    return working_dir / mode / position / name
 
 
 def get_timestamp(data_container):
     return data_container["timestamp"]
+
+def list_condition()->list[int]:
+    result = []
+    result.append(0)
+    for mode in range(len(MODE)):
+        if mode != MODE_NEVER:
+            for position in range(len(POSITIONS)):
+                if position != POSITION_NONE:
+                    result.append(calc_condition(mode,position))
+    return result
+
 
 POSITIONS = ["なし","首筋", "頸動脈"]
 def get_position_number(position:Optional[str])->int:
@@ -41,7 +56,6 @@ def get_mode_number(mode:Optional[str])->int:
 POSITION_NONE = 0
 MODE_NEVER = 0
 def calc_condition(mode:int,position:int)->int:
-    print(f"calc condition:{mode} {position}")
     return (position << 2 & 0b00001100) + (mode & 0b00000011)
 
 def get_mode(condition:int) ->str:

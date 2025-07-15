@@ -104,7 +104,7 @@ class VectionSurveyStepFactory:
 
     def create(self, frame: ttk.Frame, set_complete: Callable[[bool], None]) -> Step:
         ui = VectionSurveyStepUI(frame)
-        save_dir = sutil.get_save_dir(self.working_dir, self.data_container)
+        save_dir = sutil.get_save_dir_from_container(self.working_dir, self.data_container)
         file_name = f"vection_{sutil.get_timestamp(self.data_container)}"
         data_saver = DataSaver(save_dir, file_name)
         return VectionSurveyStep(set_complete, ui, data_saver)

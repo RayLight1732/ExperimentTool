@@ -77,7 +77,7 @@ class SSQStepFactory:
             cell_margin=margin,
         )
         processor = SSQImageProcessor(CorrectionProcessor(1000, 900), markseat_reader)
-        save_dir = sutil.get_save_dir(self.working_dir, self.data_container)
+        save_dir = sutil.get_save_dir_from_container(self.working_dir, self.data_container)
         file_name = (
             f"{self.file_name_prefix}_{sutil.get_timestamp(self.data_container)}_{self.file_name_suffix}"
         )

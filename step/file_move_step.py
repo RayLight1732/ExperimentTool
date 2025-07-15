@@ -12,6 +12,9 @@ class FileMoveStepUI:
         self.container = container
         self.label = None
 
+    def build(self,set_complete):
+        ttk.Button(self.container, text="スキップ",command=lambda:set_complete(True))
+        
     def show_waiting(self):
         self.label = ttk.Label(self.container, text="ファイルを待っています...")
         self.label.pack()
@@ -55,6 +58,7 @@ class FileMoveStep(Step):
         self.after_id = None
 
     def build(self):
+        self.ui.build(self.set_complete)
         self.ui.show_waiting()
         self._update()
 
@@ -81,6 +85,6 @@ class FileMoveStepFactory:
 
     def create(self, frame: ttk.Frame, set_complete: Callable[[bool], None]) -> Step:
         ui = FileMoveStepUI(frame)
-        save_dir = sutil.get_save_dir(self.working_dir, self.data_container)
+        save_dir = sutil.get_save_dir_from_container(self.working_dir, self.data_container)
         processor = FileMoveProcessor(self.src_dir, save_dir, "*.csv")
         return FileMoveStep(frame, set_complete, ui, processor)

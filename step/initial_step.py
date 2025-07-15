@@ -4,6 +4,7 @@ from typing import Callable, Optional
 from step.step import Step
 from datetime import datetime
 import step.util as sutil
+from pathlib import Path
 
 
 class InitialStepUI:
@@ -17,6 +18,7 @@ class InitialStepUI:
         self.mode = -1
         self.position = sutil.POSITION_NONE
         self.position_label = None
+        self.completed_label = []
 
     def build(self):
         ttk.Label(self.container, text="名前を入力").pack()
@@ -70,15 +72,42 @@ class InitialStepUI:
         self.position_label.pack_forget()
         self.position_combobox.pack_forget()
 
+    def set_completed(self,completed:list[int]):
+        for label in self.completed_label:
+            label.destroy()
+        for condition in completed:
+            mode = sutil.get_mode(condition)
+            position = sutil.get_position(condition)
+            if mode == sutil.MODE_NEVER:
+                label_text = mode
+            else:
+                label_text = f"{mode}/{position}"
+            label = ttk.Label(self.container, text=label_text)
+            label.pack(side="bottom")
+            self.completed_label.append(label)
+
+class DirectoryManager:
+    def __init__(self,working_dir:Path):
+        self.working_dir = working_dir
+
+    def get_completed_conditions(self,name:str)->list:
+        result = []
+        if name.strip():
+            for condition in sutil.list_condition():
+                if sutil.get_save_dir(self.working_dir,condition,name).exists():
+                    result.append(condition)
+        return result
 
 class InitialStep(Step):
     def __init__(
         self,
         ui: InitialStepUI,
+        directory_manager:DirectoryManager,
         set_complete: Callable[[bool], None],
         save_value: Callable[[str, int], None],
     ):
         self.set_complete = set_complete
+        self.directory_manager = directory_manager
         self.save_value = save_value
         self.ui = ui
         self.ui.on_change = self.on_value_change
@@ -88,6 +117,8 @@ class InitialStep(Step):
 
     def on_value_change(self):
         self.set_complete(self.can_proceed())
+        name = self.ui.name
+        self.ui.set_completed(self.directory_manager.get_completed_conditions(name))
 
     def before_next(self):
         mode = self.ui.mode
@@ -107,8 +138,9 @@ class InitialStep(Step):
 
 
 class InitialStepFactory:
-    def __init__(self, data_container: dict):
+    def __init__(self, data_container: dict,working_dir):
         self.data_container = data_container
+        self.working_dir = working_dir
 
     def create(self, frame: ttk.Frame, set_complete: Callable[[bool], None]) -> Step:
         def save(name: str, condition: int):
@@ -117,6 +149,6 @@ class InitialStepFactory:
             now = datetime.now()
             timestamp = now.strftime("%Y%m%d_%H%M%S")
             self.data_container["timestamp"] = timestamp
-
+        directory_manager = DirectoryManager(self.working_dir)
         ui = InitialStepUI(frame)
-        return InitialStep(ui, set_complete, save)
+        return InitialStep(ui,directory_manager, set_complete, save)
