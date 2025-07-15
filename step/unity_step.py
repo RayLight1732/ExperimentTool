@@ -28,7 +28,7 @@ class UnityStepUI:
         self.checklist = checklist
         self.check_vars = []
 
-    def build(self, on_connect_unity, on_connect_arduino, on_start,on_reset_pose):
+    def build(self, on_connect_unity, on_connect_arduino, on_start,on_reset_pose,on_status_change):
         ttk.Label(self.container,text=f"{self.mode} {self.position}").pack(side="top")
         ttk.Label(self.container, text="IPアドレス").pack(side="top")
 
@@ -80,7 +80,7 @@ class UnityStepUI:
         self.check_vars = []
         for check_item in self.checklist:
             check_var = tk.BooleanVar()
-            chk = ttk.Checkbutton(self.container, text=check_item, variable=check_var)
+            chk = ttk.Checkbutton(self.container, text=check_item, variable=check_var,command=on_status_change)
             chk.pack(side="bottom",pady=4)
             self.check_vars.append(check_var)
 
@@ -274,7 +274,8 @@ class UnityStep(Step):
             on_connect_unity=self._connect_unity,
             on_connect_arduino=self._connect_arduino,
             on_start=self._start,
-            on_reset_pose=self.controller.reset_pose
+            on_reset_pose=self.controller.reset_pose,
+            on_status_change=self._update_status
         )
         self._update()
 
@@ -298,6 +299,7 @@ class UnityStep(Step):
 
 
     def _update_status(self):
+        print("update status")
         self.ui.set_unity_status(self.controller.unity_client.connected)
         self.ui.set_arduino_status(self.controller.arduino_client.connected)
         self.ui.set_reset_pose_button_enabled(self.controller.unity_client.connected)
