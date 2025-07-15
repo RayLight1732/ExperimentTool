@@ -5,7 +5,8 @@ from step.step import Step
 from datetime import datetime
 import step.util as sutil
 from pathlib import Path
-
+import os
+from datetime import datetime
 
 class InitialStepUI:
     def __init__(self, container: ttk.Frame):
@@ -19,6 +20,7 @@ class InitialStepUI:
         self.position = sutil.POSITION_NONE
         self.position_label = None
         self.completed_label = []
+        self.last_modified_label = None
 
     def build(self):
         ttk.Label(self.container, text="名前を入力").pack()
@@ -72,6 +74,16 @@ class InitialStepUI:
         self.position_label.pack_forget()
         self.position_combobox.pack_forget()
 
+    def set_last_modified(self,timestamp):
+        # フォーマットして表示
+        if self.last_modified_label is not None:
+            self.last_modified_label.destroy()
+        if timestamp != -1:
+            dt = datetime.fromtimestamp(timestamp)
+            label_text = f"{dt.month}月 {dt.day}日 {dt.hour}時 {dt.minute}分 {dt.second}秒"
+            self.last_modified_label = ttk.Label(self.container,text=label_text)
+            self.last_modified_label.pack(side="bottom")
+
     def set_completed(self,completed:list[int]):
         for label in self.completed_label:
             label.destroy()
@@ -97,6 +109,14 @@ class DirectoryManager:
                 if sutil.get_save_dir(self.working_dir,condition,name).exists():
                     result.append(condition)
         return result
+    
+    def get_last_modified_time(self,name:str)->list:
+        completed = self.get_completed_conditions(name)
+        last = -1
+        for condition in completed:
+            path = sutil.get_save_dir(self.working_dir,condition,name)
+            last = max(os.path.getmtime(path),last)
+        return last
 
 class InitialStep(Step):
     def __init__(
@@ -119,6 +139,7 @@ class InitialStep(Step):
         self.set_complete(self.can_proceed())
         name = self.ui.name
         self.ui.set_completed(self.directory_manager.get_completed_conditions(name))
+        self.ui.set_last_modified(self.directory_manager.get_last_modified_time(name))
 
     def before_next(self):
         mode = self.ui.mode
