@@ -60,7 +60,7 @@ def main(working_dir: Path, bb_dir: Path,sound_path:Path):
 
     data_container = {}
 
-    name_step_factory = InitialStepFactory(data_container)
+    name_step_factory = InitialStepFactory(data_container,working_dir)
     mssq_factory = MSSQStepFactory(working_dir, data_container, q)
     before_ssq_factory = SSQStepFactory(working_dir, data_container, q, "SSQ", "before")
     unity_step_factory = UnityStepFactory(data_container,sound_path)
