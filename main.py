@@ -43,7 +43,7 @@ def on_receive(queue: queue.Queue, decodedData: DecodedData):
 # ---------------------
 # main
 # ---------------------
-def main(working_dir: Path, bb_dir: Path):
+def main(working_dir: Path, bb_dir: Path,sound_path:Path):
     decoder = ImageDataDecoder()
     q = queue.Queue(0)
     server = TCPServer(decoder, lambda data: on_receive(q, data), port=51234)
@@ -63,7 +63,7 @@ def main(working_dir: Path, bb_dir: Path):
     name_step_factory = InitialStepFactory(data_container)
     mssq_factory = MSSQStepFactory(working_dir, data_container, q)
     before_ssq_factory = SSQStepFactory(working_dir, data_container, q, "SSQ", "before")
-    unity_step_factory = UnityStepFactory(data_container)
+    unity_step_factory = UnityStepFactory(data_container,sound_path)
     file_move_step_factory = FileMoveStepFactory(bb_dir, working_dir, data_container)
     vection_survey_step_factory = VectionSurveyStepFactory(working_dir, data_container)
     after_ssq_factory = SSQStepFactory(working_dir, data_container, q, "SSQ", "after")
@@ -109,4 +109,5 @@ if __name__ == "__main__":
     # working_dir を取得
     working_dir = config.get("working_dir")
     bb_dir = config.get("bb_dir")
-    main(Path(working_dir), Path(bb_dir))
+    sound_path = config.get("sound_path")
+    main(Path(working_dir), Path(bb_dir),Path(sound_path))

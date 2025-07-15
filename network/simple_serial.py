@@ -43,7 +43,7 @@ class PingSender(threading.Thread):
         while self.running:
             try:
                 self.send("ping", False)
-                time.sleep(0.05)  # 50ms
+                time.sleep(0.01)  # 10ms
             except Exception:
                 pass
 

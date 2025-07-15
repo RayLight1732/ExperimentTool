@@ -231,17 +231,20 @@ class UnityStep(Step):
         step_ui: UnityStepUI,
         controller: UnityStepController,
         save_ip_port:Callable[[str,int],None],
-        sound_player:SoundPlayer
+        sound_player:SoundPlayer,
+        container:ttk.Frame
     ):
         self.ui = step_ui
         self.controller = controller
         self.set_complete = set_complete
         self.save_ip_port = save_ip_port
         self.sound_player = sound_player
+        self.container = container
 
         self.controller.on_started = self._on_started
         self.controller.on_finished = self._on_finished
         self.controller.on_status_change = self._update_status
+        self.after_id = None
 
     def build(self):
         self.ui.build(
@@ -249,6 +252,7 @@ class UnityStep(Step):
             on_connect_arduino=self._connect_arduino,
             on_start=self._start,
         )
+        self._update()
 
     def _connect_unity(self):
         ip = self.ui.get_ip()
@@ -265,7 +269,7 @@ class UnityStep(Step):
         self.ui.destroy_start_button()
 
     def _on_started(self):
-        self.ui.show_started
+        self.ui.show_started()
         self.sound_player.set_state(True)
 
 
@@ -282,10 +286,16 @@ class UnityStep(Step):
     def on_dispose(self):
         self.controller.dispose()
         self.sound_player.set_state(False)
+        if self.after_id:
+            self.container.after_cancel(self.after_id)
+
 
     def before_next(self):
         pass
 
+    def _update(self):
+        self.sound_player.update()
+        self.after_id = self.container.after(30, self._update)
 
 class UnityStepFactory:
     def __init__(self, data_container: dict,sound_path:Path):
@@ -308,4 +318,4 @@ class UnityStepFactory:
         arduino_client = ArduinoSerial(port="COM3")
         controller = UnityStepController(unity_client, arduino_client, condition)
         sound_player = SoundPlayer(self.sound_path)
-        return UnityStep(set_complete, ui, controller,self.save_ip_port,sound_player)
+        return UnityStep(set_complete, ui, controller,self.save_ip_port,sound_player,frame)
