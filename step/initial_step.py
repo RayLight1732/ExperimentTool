@@ -87,7 +87,7 @@ class InitialStepUI:
     def set_completed(self,completed:list[int]):
         for label in self.completed_label:
             label.destroy()
-        for condition in completed:
+        for condition in reversed(completed):
             mode = sutil.get_mode(condition)
             position = sutil.get_position(condition)
             if mode == sutil.MODE_NEVER:
