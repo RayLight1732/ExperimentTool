@@ -13,7 +13,7 @@ class FileMoveStepUI:
         self.label = None
 
     def build(self,set_complete):
-        ttk.Button(self.container, text="スキップ",command=lambda:set_complete(True))
+        ttk.Button(self.container, text="スキップ",command=lambda:set_complete(True)).pack()
         
     def show_waiting(self):
         self.label = ttk.Label(self.container, text="ファイルを待っています...")
