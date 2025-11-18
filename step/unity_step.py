@@ -290,7 +290,7 @@ class PeriodicalSignalSender:
     def update(self):
         if self.started and self.period > 0:
             now = datetime.now()
-            if (now - self.start_time).total_seconds() > self.period:
+            if (now - self.start_time).total_seconds() >= self.period:
                 self.high = not self.high
                 if self.high:
                     self.client.send("high")
