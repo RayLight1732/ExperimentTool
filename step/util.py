@@ -42,7 +42,7 @@ def get_position_number(position:Optional[str])->int:
         return POSITION_NONE
 
 
-MODE = ["なし","周期的","常時"]
+MODE = ["なし","酔いやすい場面のみ","常時","周期的"]
 def get_mode_number(mode:Optional[str])->int:
     """
     デフォルトは-1を返す
