@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import ttk
-from typing import Callable
+from typing import Callable, List
 from step.step import Step
 import step.util as sutil
 from network.data.multi_type_data_decoder import MultiTypeDataDecoder
@@ -11,6 +11,23 @@ from network.simple_serial import ArduinoSerial
 from pathlib import Path
 import simpleaudio as sa
 from datetime import datetime
+import csv
+
+
+class DataSaver:
+    def __init__(self, save_dir: Path, file_name: str):
+        self.save_dir = save_dir
+        self.file_name = file_name
+
+    def _ensure_dir_exists(self):
+        self.save_dir.mkdir(parents=True, exist_ok=True)
+
+    def save_csv(self, answers: List[int]):
+        self._ensure_dir_exists()
+        csv_path = self.save_dir / f"{self.file_name}.csv"
+        with open(csv_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(answers)
 
 
 class UnityStepUI:
@@ -22,6 +39,7 @@ class UnityStepUI:
         default_ip: str = "",
         default_port=51234,
         checklist: list[str] = [],
+        lap_count: int = 5,
     ):
         self.container = container
         self.position = position
@@ -36,6 +54,10 @@ class UnityStepUI:
         self.started_text = None
         self.checklist = checklist
         self.check_vars = []
+        self.controller_container = ttk.Frame(self.container)
+        self.fms_container = ttk.Frame(self.container)
+        self.radio_vars: list[tk.IntVar] = []
+        self.lap_count = lap_count
 
     def build(
         self,
@@ -45,23 +67,33 @@ class UnityStepUI:
         on_reset_pose,
         on_status_change,
     ):
-        ttk.Label(self.container, text=f"{self.mode} {self.position}").pack(side="top")
-        ttk.Label(self.container, text="IPアドレス").pack(side="top")
+        self.container.columnconfigure(0, weight=2)
+        self.container.columnconfigure(1, weight=1)
+        self.container.rowconfigure(0, weight=1)
+
+        # 制御側
+
+        self.controller_container.grid(row=0, column=0, sticky="nsew")
+
+        ttk.Label(self.controller_container, text=f"{self.mode} {self.position}").pack(
+            side="top"
+        )
+        ttk.Label(self.controller_container, text="IPアドレス").pack(side="top")
 
         self.ip_var = tk.StringVar()
         self.ip_var.trace_add("write", self._validate_ip_port)
-        self.ip_entry = ttk.Entry(self.container, textvariable=self.ip_var)
+        self.ip_entry = ttk.Entry(self.controller_container, textvariable=self.ip_var)
 
         self.ip_entry.pack(pady=(0, 10), side="top")
 
         # port: 数字のみを許可する validatecommand の設定
-        ttk.Label(self.container, text="ポート番号").pack(side="top")
-        vcmd = (self.container.register(self._validate_port_entry), "%P")
+        ttk.Label(self.controller_container, text="ポート番号").pack(side="top")
+        vcmd = (self.controller_container.register(self._validate_port_entry), "%P")
 
         self.port_var = tk.StringVar()
         self.port_var.trace_add("write", self._validate_ip_port)
         self.port_entry = ttk.Entry(
-            self.container,
+            self.controller_container,
             textvariable=self.port_var,
             validate="key",
             validatecommand=vcmd,
@@ -69,7 +101,7 @@ class UnityStepUI:
         self.port_entry.pack(pady=(0, 10), side="top")
 
         self.connect_button = ttk.Button(
-            self.container,
+            self.controller_container,
             text="Unityに接続",
             command=on_connect_unity,
             state="disabled",
@@ -77,36 +109,59 @@ class UnityStepUI:
         self.connect_button.pack(side="top")
 
         self.arduino_connect_button = ttk.Button(
-            self.container, text="Arduinoに接続", command=on_connect_arduino
+            self.controller_container, text="Arduinoに接続", command=on_connect_arduino
         )
         self.arduino_connect_button.pack(side="top")
 
         self.reset_pose_button = ttk.Button(
-            self.container,
+            self.controller_container,
             text="ポーズリセット",
             state="disabled",
             command=on_reset_pose,
         )
         self.reset_pose_button.pack(side="top")
         self.start_button = ttk.Button(
-            self.container, text="開始", state="disabled", command=on_start
+            self.controller_container, text="開始", state="disabled", command=on_start
         )
         self.start_button.pack(side="top")
 
         self.ip_entry.insert(0, self.default_ip)
         self.port_entry.insert(0, str(self.default_port))
 
-        self.check_vars = []
         for check_item in self.checklist:
             check_var = tk.BooleanVar()
             chk = ttk.Checkbutton(
-                self.container,
+                self.controller_container,
                 text=check_item,
                 variable=check_var,
                 command=on_status_change,
             )
             chk.pack(side="bottom", pady=4)
             self.check_vars.append(check_var)
+
+        self._build_fms(on_status_change)
+
+    def _build_fms(self, on_status_change):
+        # fms
+        self.fms_container.grid(row=0, column=1, sticky="nsew")
+        ttk.Label(self.fms_container, text="FMS").pack(side="top")
+
+        inner = ttk.Frame(self.fms_container)
+        inner.pack(expand=True, side="top", anchor="n")
+        for lap in range(self.lap_count):
+            ttk.Label(inner, text=f"{lap+1}周終了時").grid(
+                row=lap, column=0, sticky="w", padx=5
+            )
+            var = tk.IntVar(value=-1)
+            self.radio_vars.append(var)
+            for col in range(5):
+                ttk.Radiobutton(
+                    inner,
+                    value=col,
+                    variable=var,
+                    style="NoFocus.TRadiobutton",
+                    command=on_status_change,
+                ).grid(row=lap, column=col + 1, sticky="w", padx=5, pady=5)
 
     def _validate_port_entry(self, new_value):
         return new_value == "" or new_value.isdigit()
@@ -141,13 +196,13 @@ class UnityStepUI:
 
     def show_started(self):
         if self.started_text is None:
-            self.started_text = tk.Label(self.container, text="実験中")
+            self.started_text = tk.Label(self.controller_container, text="実験中")
             self.started_text.pack(pady=20)
 
     def show_finished(self):
         if self.started_text:
             self.started_text.destroy()
-        tk.Label(self.container, text="終了しました").pack(pady=20)
+        tk.Label(self.controller_container, text="終了しました").pack(pady=20)
 
     def destroy_start_button(self):
         self.start_button.destroy()
@@ -156,16 +211,28 @@ class UnityStepUI:
     def is_check_list_filled(self) -> bool:
         return all(var.get() for var in self.check_vars)
 
+    def get_radio_values(self) -> List[int]:
+        return [var.get() for var in self.radio_vars]
+
+    def is_radio_fills(self) -> bool:
+        return all(val != -1 for val in self.get_radio_values())
+
 
 class UnityStepController:
     def __init__(
-        self, unity_client: TCPClient, arduino_client: ArduinoSerial, condition: int
+        self,
+        unity_client: TCPClient,
+        arduino_client: ArduinoSerial,
+        saver: DataSaver,
+        condition: int,
     ):
         self.unity_client = unity_client
         self.arduino_client = arduino_client
+        self.saver = saver
         self.condition = condition
         self.on_started = None
-        self.on_finished = None
+        self.get_fms_value: Callable[[], List[int]] = None
+        self.__finished = False
 
         self.unity_client.on_receive = self.on_receive
         self.unity_client.on_connected = self._on_unity_connected
@@ -218,8 +285,9 @@ class UnityStepController:
             message = decodedData.get_data()
             if message == "end":
                 self.arduino_client.send("end")
-                if self.on_finished:
-                    self.on_finished()
+                self.__finished = True
+                if self.on_status_change:
+                    self.on_status_change()
             elif message == "started":
                 self.arduino_client.send(f"mode{self.condition}")
                 self.arduino_client.send("start")
@@ -246,6 +314,13 @@ class UnityStepController:
 
         self.unity_client.disconnect()
         self.arduino_client.disconnect()
+
+    def save(self):
+        self.saver.save_csv(self.get_fms_value())
+
+    @property
+    def finished(self):
+        return self.__finished
 
 
 class SoundPlayer:
@@ -300,6 +375,8 @@ class PeriodicalSignalSender:
 
 
 class UnityStep(Step):
+
+    # TODO これはControllerとUIをつなぐぐらいにとどめたほうがいいのでは・
     def __init__(
         self,
         set_complete: Callable[[bool], None],
@@ -319,8 +396,8 @@ class UnityStep(Step):
         self.periodicalSignalSender = periodicalSignalSender
 
         self.controller.on_started = self._on_started
-        self.controller.on_finished = self._on_finished
         self.controller.on_status_change = self._update_status
+        self.controller.get_fms_value = self.ui.get_radio_values
         self.after_id = None
 
     def build(self):
@@ -361,11 +438,12 @@ class UnityStep(Step):
             self.controller.can_start() and self.ui.is_check_list_filled()
         )
 
-    def _on_finished(self):
-        self.ui.show_finished()
-        self.sound_player.set_state(False)
-        self.set_complete(True)
-        self.periodicalSignalSender.stop()
+        if self.controller.finished:
+            self.ui.show_finished()
+            self.sound_player.set_state(False)
+            self.periodicalSignalSender.stop()
+            if self.ui.is_radio_fills():
+                self.set_complete(True)
 
     def on_dispose(self):
         self.controller.dispose()
@@ -383,9 +461,13 @@ class UnityStep(Step):
 
 
 class UnityStepFactory:
-    def __init__(self, data_container: dict, sound_path: Path):
+    def __init__(
+        self, data_container: dict, working_dir: Path, sound_path: Path, lap_count: int
+    ):
         self.data_container = data_container
         self.sound_path = sound_path
+        self.lap_count = lap_count
+        self.working_dir = working_dir
 
     def save_ip_port(self, ip: str, port: int):
         self.data_container["ip"] = ip
@@ -402,16 +484,26 @@ class UnityStepFactory:
             "ヘッドホンは装着されていますか",
             "バランスボードの計測ボタンは押しましたか",
         ]
-        ui = UnityStepUI(frame, position, mode, ip, port, checklist)
+        ui = UnityStepUI(frame, position, mode, ip, port, checklist, self.lap_count)
+
         decoder = MultiTypeDataDecoder({STRING_DATA_TYPE: StringDataDecoder()})
         unity_client = TCPClient(decoder)
+
         arduino_client = ArduinoSerial(port="COM3")
-        controller = UnityStepController(unity_client, arduino_client, condition)
+
+        save_dir = sutil.get_save_dir_from_container(
+            self.working_dir, self.data_container
+        )
+        file_name = f"FMS_{sutil.get_timestamp(self.data_container)}"
+        saver = DataSaver(save_dir, file_name)
+
+        controller = UnityStepController(unity_client, arduino_client, saver, condition)
         sound_player = SoundPlayer(self.sound_path)
         if sutil.get_mode_number(mode) == 3:
             periodical = PeriodicalSignalSender(5, arduino_client)
         else:
             periodical = PeriodicalSignalSender(-1, arduino_client)
+
         return UnityStep(
             set_complete,
             ui,

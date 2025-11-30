@@ -59,3 +59,7 @@ def test_periodical_signal_sender(mocker):
     sender.update()
     assert len(send_log) == 2
     assert send_log[1] == (2, "low")
+
+
+def test_unity_step(mocker):
+    pass
