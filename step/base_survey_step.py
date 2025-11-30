@@ -146,8 +146,7 @@ class BaseDataSaver:
         csv_path = self.save_dir / f"{self.file_name}.csv"
         with open(csv_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
-            for value in answers:
-                writer.writerow([value])
+            writer.writerow(answers)
 
     def load(self) -> Tuple[Optional[Image.Image], Optional[list[int]]]:
         image_path = self.save_dir / f"{self.file_name}.jpeg"
@@ -163,7 +162,7 @@ class BaseDataSaver:
         try:
             with open(csv_path, "r", newline="", encoding="utf-8") as f:
                 reader = csv.reader(f)
-                answers = [int(row[0]) for row in reader if row]
+                answers = next(reader)
         except Exception:
             pass
 
