@@ -1,7 +1,7 @@
 # step/mssq_step.py
 
 from step.base_survey_step import (
-    BaseStepUI,
+    BaseSurveyUI,
     BaseImageProcessor,
     BaseDataSaver,
     BaseSurveyStep,
@@ -64,7 +64,7 @@ class MSSQStepFactory:
         data_container,
         queue: Queue,
         file_name_prefix: str = "MSSQ",
-        file_name_suffix:str = ""
+        file_name_suffix: str = "",
     ):
         self.working_dir = working_dir
         self.data_container = data_container
@@ -97,7 +97,7 @@ class MSSQStepFactory:
         processor = MSSQImageProcessor(correction_processor, reader1, 8, reader2)
         save_dir = self.working_dir / "MSSQ"
         file_name = sutil.get_name(self.data_container)
-        ui = BaseStepUI(
+        ui = BaseSurveyUI(
             frame,
             sections=[("12歳以前", 8, 5), ("直近10年", 8, 5)],
             main_title="MSSQを回答してください",

@@ -1,7 +1,7 @@
 # step/ssq_step.py
 
 from step.base_survey_step import (
-    BaseStepUI,
+    BaseSurveyUI,
     BaseImageProcessor,
     BaseDataSaver,
     BaseSurveyStep,
@@ -77,10 +77,10 @@ class SSQStepFactory:
             cell_margin=margin,
         )
         processor = SSQImageProcessor(CorrectionProcessor(1000, 900), markseat_reader)
-        save_dir = sutil.get_save_dir_from_container(self.working_dir, self.data_container)
-        file_name = (
-            f"{self.file_name_prefix}_{sutil.get_timestamp(self.data_container)}_{self.file_name_suffix}"
+        save_dir = sutil.get_save_dir_from_container(
+            self.working_dir, self.data_container
         )
-        ui = BaseStepUI(frame, [("", 16, 4)], "SSQを回答してください")
+        file_name = f"{self.file_name_prefix}_{sutil.get_timestamp(self.data_container)}_{self.file_name_suffix}"
+        ui = BaseSurveyUI(frame, [("", 16, 4)], "SSQを回答してください")
         saver = BaseDataSaver(save_dir, file_name)
         return BaseSurveyStep(self.queue, frame, set_complete, ui, processor, saver)

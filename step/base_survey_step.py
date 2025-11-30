@@ -9,7 +9,8 @@ import numpy as np
 import csv
 from pathlib import Path
 
-class BaseStepUI:
+
+class BaseSurveyUI:
     def __init__(
         self,
         container: ttk.Frame,
@@ -31,7 +32,9 @@ class BaseStepUI:
         # カメラ側
         camera_container = ttk.Frame(self.container)
         camera_container.grid(row=0, column=0, sticky="nsew")
-        self.canvas = tk.Canvas(camera_container, background="gray", highlightthickness=0)
+        self.canvas = tk.Canvas(
+            camera_container, background="gray", highlightthickness=0
+        )
         self.canvas.pack(expand=True, fill="both")
         self.canvas.bind("<Configure>", on_resize)
 
@@ -41,15 +44,21 @@ class BaseStepUI:
         ttk.Label(display_container, text=self.main_title).pack(side="top")
 
         style = ttk.Style()
-        style.layout("NoFocus.TRadiobutton", [
-            ("Radiobutton.padding", {
-                "children": [
-                    ("Radiobutton.indicator", {"side": "left"}),
-                    ("Radiobutton.label", {"side": "left"})
-                ],
-                "sticky": "nswe"
-            })
-        ])
+        style.layout(
+            "NoFocus.TRadiobutton",
+            [
+                (
+                    "Radiobutton.padding",
+                    {
+                        "children": [
+                            ("Radiobutton.indicator", {"side": "left"}),
+                            ("Radiobutton.label", {"side": "left"}),
+                        ],
+                        "sticky": "nswe",
+                    },
+                )
+            ],
+        )
 
         for section_title, row_count, col_count in self.sections:
             ttk.Label(display_container, text=section_title).pack(side="top", padx=10)
@@ -57,7 +66,9 @@ class BaseStepUI:
             inner.pack(expand=True, side="top", anchor="n")
 
             for row in range(row_count):
-                ttk.Label(inner, text=f"Q{row+1}").grid(row=row, column=0, sticky="w", padx=5)
+                ttk.Label(inner, text=f"Q{row+1}").grid(
+                    row=row, column=0, sticky="w", padx=5
+                )
                 var = tk.IntVar(value=-1)
                 self.radio_vars.append(var)
                 for col in range(col_count):
@@ -69,7 +80,7 @@ class BaseStepUI:
                         command=on_radio_update,
                     ).grid(row=row, column=col + 1, sticky="w", padx=5, pady=5)
 
-    def update_canvas(self, pil_image: Optional[Image.Image]): 
+    def update_canvas(self, pil_image: Optional[Image.Image]):
         self.canvas.delete("all")
         if pil_image is None:
             self.canvas.create_text(
@@ -80,7 +91,7 @@ class BaseStepUI:
                 font=("Arial", 14),
             )
             return
-        
+
         canvas_ratio = self.canvas.winfo_width() / self.canvas.winfo_height()
         img_ratio = pil_image.width / pil_image.height
         if canvas_ratio > img_ratio:
@@ -106,11 +117,16 @@ class BaseStepUI:
 
 
 class BaseImageProcessor:
-    def read_answers(self, image: Image.Image) -> Tuple[list[int], np.ndarray] | Tuple[None, None]:
+    def read_answers(
+        self, image: Image.Image
+    ) -> Tuple[list[int], np.ndarray] | Tuple[None, None]:
         raise NotImplementedError
 
-    def overlay_image(self, image: Image.Image, rect, answers: list[int]) -> Image.Image:
+    def overlay_image(
+        self, image: Image.Image, rect, answers: list[int]
+    ) -> Image.Image:
         raise NotImplementedError
+
 
 class BaseDataSaver:
     def __init__(self, save_dir: Path, file_name: str):
@@ -158,9 +174,9 @@ class BaseSurveyStep(Step):
     def __init__(
         self,
         queue: Queue,
-        container:tk.Frame,
+        container: tk.Frame,
         set_complete: Callable[[bool], None],
-        ui: BaseStepUI,
+        ui: BaseSurveyUI,
         processor: BaseImageProcessor,
         saver: BaseDataSaver,
     ):
