@@ -291,12 +291,16 @@ class UnityStepController:
             elif message == "started":
                 self.arduino_client.send(f"mode{self.condition}")
                 self.arduino_client.send("start")
+                if sutil.get_mode_number(sutil.get_mode(self.condition)) == 2:
+                    self.arduino_client.send("high")
                 if self.on_started:
                     self.on_started()
             elif message == "high":
-                self.arduino_client.send("high")
+                if sutil.get_mode_number(sutil.get_mode(self.condition)) == 1:
+                    self.arduino_client.send("high")
             elif message == "low":
-                self.arduino_client.send("low")
+                if sutil.get_mode_number(sutil.get_mode(self.condition)) == 1:
+                    self.arduino_client.send("low")
         else:
             print(f"Receive {decodedData.get_name()}")
 
