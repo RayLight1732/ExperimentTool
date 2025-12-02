@@ -140,6 +140,53 @@ class ArduinoSerial:
             if self.on_disconnected is not None:
                 self.on_disconnected()
 
+class ArduinoSerialMock:
+    def __init__(self, baudrate=115200, port=None):
+        self.baudrate = baudrate
+        self.serial_port = None
+        self.lock = threading.Lock()
+        self.port = port
+        self._receiver: Optional[DataReceiver] = None
+        self._ping_sender: Optional[PingSender] = None
+        self.on_connected: Optional[Callable[[], None]] = None
+        self.on_disconnected: Optional[Callable[[], None]] = None
+        self.on_receive: Optional[Callable[[str], None]] = None
+        self._connected = False    
+
+    def list_ports(self):
+        return []
+
+    def find_arduino_port(self):
+        return None
+
+    @property
+    def connected(self) -> bool:
+        return self._connected
+
+    def connect(self) -> bool:
+        if not self._connected:
+            self._connected = True
+            print("connect to arduino")
+            if self.on_connected is not None:
+                self.on_connected()
+            return True
+        else:
+            print("failed to connect to arduino: already connected")
+            return False
+
+    def send(self, msg: str, debug: bool = True):
+        if self._connected:
+            print(f"successded to send message to arduino: {msg}")
+        else:
+            print("failed to send message to arduino: not connected")
+
+    def disconnect(self):
+        if self._connected:
+            print("disconnected from aduino")
+            if self.on_disconnected is not None:
+                self.on_disconnected()
+        else:
+            print("failed to disconnected fro arduino: not connectedd")
 
 # --- 実行例 ---
 if __name__ == "__main__":
