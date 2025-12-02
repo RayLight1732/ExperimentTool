@@ -7,7 +7,7 @@ from network.data.multi_type_data_decoder import MultiTypeDataDecoder
 from network.data.string_data import STRING_DATA_TYPE, StringDataDecoder, StringData
 from network.tcp_client import TCPClient
 from network.data.data_decoder import DecodedData
-from network.simple_serial import ArduinoSerial
+from network.simple_serial import ArduinoSerial,ArduinoSerialMock
 from pathlib import Path
 import simpleaudio as sa
 from datetime import datetime
@@ -52,6 +52,7 @@ class UnityStepUI:
         self.arduino_connect_button = None
         self.start_button = None
         self.started_text = None
+        self.finished_text = None
         self.checklist = checklist
         self.check_vars = []
         self.controller_container = ttk.Frame(self.container)
@@ -189,10 +190,12 @@ class UnityStepUI:
         )
 
     def set_start_button_enabled(self, enabled: bool):
-        self.start_button["state"] = "normal" if enabled else "disabled"
+        if self.start_button.winfo_exists():
+            self.start_button["state"] = "normal" if enabled else "disabled"
 
     def set_reset_pose_button_enabled(self, enabled: bool):
-        self.reset_pose_button["state"] = "normal" if enabled else "disabled"
+        if self.reset_pose_button.winfo_exists():
+         self.reset_pose_button["state"] = "normal" if enabled else "disabled"
 
     def show_started(self):
         if self.started_text is None:
@@ -202,7 +205,8 @@ class UnityStepUI:
     def show_finished(self):
         if self.started_text:
             self.started_text.destroy()
-        tk.Label(self.controller_container, text="終了しました").pack(pady=20)
+        if self.finished_text is not None:
+            self.finished_text = tk.Label(self.controller_container, text="終了しました").pack(pady=20)
 
     def destroy_start_button(self):
         self.start_button.destroy()
@@ -250,7 +254,6 @@ class UnityStepController:
 
     def connect_arduino(self):
         if not self.arduino_client.connected:
-            print(self.arduino_client.list_ports())
             self.arduino_client.connect()
 
     def can_start(self):
@@ -479,7 +482,7 @@ class UnityStepFactory:
 
     def create(self, frame: ttk.Frame, set_complete: Callable[[bool], None]) -> Step:
         condition = self.data_container["condition"]
-        ip = self.data_container.get("ip", "10.226.46.173")
+        ip = self.data_container.get("ip", "192.168.30.12")
         port = self.data_container.get("port", 51234)
         mode = sutil.get_mode(condition)
         position = sutil.get_position(condition)
