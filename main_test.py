@@ -15,7 +15,7 @@ import tkinter as tk
 import argparse
 import yaml
 from gui import MainWindow, StepManager
-
+from datetime import datetime
 
 def on_receive(queue: queue.Queue, decodedData: DecodedData):
     if decodedData.get_name() == IMAGE_DATA_TYPE:
@@ -63,10 +63,12 @@ def main(working_dir: Path, bb_dir: Path, sound_path: Path):
     name_step_factory = InitialStepFactory(data_container, working_dir)
     mssq_factory = MSSQStepFactory(working_dir, data_container, q)
     before_ssq_factory = SSQStepFactory(working_dir, data_container, q, "SSQ", "before")
-    unity_step_factory = UnityStepFactory(data_container, sound_path, 5)
+    unity_step_factory = UnityStepFactory(data_container,working_dir, sound_path, 5)
     file_move_step_factory = FileMoveStepFactory(bb_dir, working_dir, data_container)
     vection_survey_step_factory = VectionSurveyStepFactory(working_dir, data_container)
     after_ssq_factory = SSQStepFactory(working_dir, data_container, q, "SSQ", "after")
+    data_container["name"] = "test"
+    data_container["timestamp"] = datetime.now().strftime("%Y%m%d_%H%M%S")
     data_container["condition"] = 5
     factories = [
         # name_step_factory.create,

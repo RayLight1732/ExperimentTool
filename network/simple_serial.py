@@ -190,19 +190,15 @@ class ArduinoSerialMock:
 
 # --- 実行例 ---
 if __name__ == "__main__":
-    # arduino = ArduinoSerial(port="COM3")
-    # arduino.connect()
-    # try:
-    #     while True:
-    #         user_input = input("Enter message to send (or 'exit'): ")
-    #         if user_input.lower() == "exit":
-    #             break
-    #         arduino.send(user_input)
-    # except KeyboardInterrupt:
-    #     print("\n[INFO] Interrupted by user.")
-    # finally:
-    #     arduino.disconnect()
-    ports = list(serial.tools.list_ports.comports())
-    for port in ports:
-        desc = port.description.lower()
-        print(desc, port.device)
+    arduino = ArduinoSerial(port="COM3")
+    arduino.connect()
+    try:
+        while True:
+            user_input = input("Enter message to send (or 'exit'): ")
+            if user_input.lower() == "exit":
+                break
+            arduino.send(user_input)
+    except KeyboardInterrupt:
+        print("\n[INFO] Interrupted by user.")
+    finally:
+        arduino.disconnect()

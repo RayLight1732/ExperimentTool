@@ -13,6 +13,12 @@ import simpleaudio as sa
 from datetime import datetime
 import csv
 
+def show_non_blocking(title,message):
+    popup = tk.Toplevel()
+    popup.title(title)
+    tk.Label(popup, text=message).pack()
+    tk.Button(popup, text="閉じる", command=popup.destroy).pack()
+
 
 class DataSaver:
     def __init__(self, save_dir: Path, file_name: str):
@@ -66,7 +72,9 @@ class UnityStepUI:
         on_connect_arduino,
         on_start,
         on_reset_pose,
+        on_sound_test,
         on_status_change,
+        on_stop
     ):
         self.container.columnconfigure(0, weight=2)
         self.container.columnconfigure(1, weight=1)
@@ -100,12 +108,14 @@ class UnityStepUI:
             validatecommand=vcmd,
         )
         self.port_entry.pack(pady=(0, 10), side="top")
+        
+        self.ip_entry.insert(0, self.default_ip)
+        self.port_entry.insert(0, str(self.default_port))
 
         self.connect_button = ttk.Button(
             self.controller_container,
             text="Unityに接続",
-            command=on_connect_unity,
-            state="disabled",
+            command=on_connect_unity
         )
         self.connect_button.pack(side="top")
 
@@ -121,13 +131,28 @@ class UnityStepUI:
             command=on_reset_pose,
         )
         self.reset_pose_button.pack(side="top")
+
+        self.sound_test_button = ttk.Button(
+            self.controller_container,
+            text="サウンドテスト",
+            state="disabled",
+            command=on_sound_test,
+        )
+        self.sound_test_button.pack(side="top")
+
         self.start_button = ttk.Button(
             self.controller_container, text="開始", state="disabled", command=on_start
         )
         self.start_button.pack(side="top")
 
-        self.ip_entry.insert(0, self.default_ip)
-        self.port_entry.insert(0, str(self.default_port))
+        self.stop_button = ttk.Button(
+            self.controller_container,
+            text="中止",
+            state="disabled",
+            command=on_stop,
+        )
+        self.stop_button.pack(side="top")
+
 
         for check_item in self.checklist:
             check_var = tk.BooleanVar()
@@ -153,16 +178,30 @@ class UnityStepUI:
             ttk.Label(inner, text=f"{lap+1}周終了時").grid(
                 row=lap, column=0, sticky="w", padx=5
             )
-            var = tk.IntVar(value=-1)
+
+            var = tk.IntVar(value=-1)     # 選択値を保持
             self.radio_vars.append(var)
-            for col in range(5):
-                ttk.Radiobutton(
-                    inner,
-                    value=col,
-                    variable=var,
-                    style="NoFocus.TRadiobutton",
-                    command=on_status_change,
-                ).grid(row=lap, column=col + 1, sticky="w", padx=5, pady=5)
+
+            # Combobox で使う表示用リスト（0〜20）
+            values = list(range(21))
+
+            combo = ttk.Combobox(
+                inner,
+                values=values,
+                state="readonly",
+                width=5
+            )
+            combo.grid(row=lap, column=1, sticky="w", padx=5, pady=5)
+
+            # Combobox の変更を IntVar に反映
+            def on_select(event, v=var, c=combo):
+                try:
+                    v.set(int(c.get()))
+                except ValueError:
+                    v.set(-1)
+                on_status_change()
+
+            combo.bind("<<ComboboxSelected>>", on_select)
 
     def _validate_port_entry(self, new_value):
         return new_value == "" or new_value.isdigit()
@@ -195,7 +234,15 @@ class UnityStepUI:
 
     def set_reset_pose_button_enabled(self, enabled: bool):
         if self.reset_pose_button.winfo_exists():
-         self.reset_pose_button["state"] = "normal" if enabled else "disabled"
+            self.reset_pose_button["state"] = "normal" if enabled else "disabled"
+
+    def set_sound_test_button_enabled(self, enabled: bool):
+        if self.sound_test_button.winfo_exists():
+             self.sound_test_button["state"] = "normal" if enabled else "disabled"
+
+    def set_stop_button_enabled(self,enabled:bool):
+        if self.stop_button.winfo_exists():
+             self.stop_button["state"] = "normal" if enabled else "disabled"
 
     def show_started(self):
         if self.started_text is None:
@@ -205,12 +252,17 @@ class UnityStepUI:
     def show_finished(self):
         if self.started_text:
             self.started_text.destroy()
-        if self.finished_text is not None:
+        if self.finished_text is None:
             self.finished_text = tk.Label(self.controller_container, text="終了しました").pack(pady=20)
+            show_non_blocking("info","実験終了")
+
+    def show_end_lap(self,lap):
+        show_non_blocking("info",f"{lap}周目終了")
 
     def destroy_start_button(self):
         self.start_button.destroy()
         self.reset_pose_button.destroy()
+        self.sound_test_button.destroy()
 
     def is_check_list_filled(self) -> bool:
         return all(var.get() for var in self.check_vars)
@@ -247,6 +299,7 @@ class UnityStepController:
         self.arduino_client.on_disconnected = self._on_arduino_disconnected
 
         self.on_status_change = None  # 状態変化時のUI更新用
+        self.on_lap_end = None # ラップ数変化時のUI更新用
 
     def connect_unity(self, ip: str, port: int):
         if not self.unity_client.connected:
@@ -267,6 +320,15 @@ class UnityStepController:
         print("reset")
         self.unity_client.send_data(StringData("reset"))
 
+    def sound_test(self):
+        print("sound test")
+        self.unity_client.send_data(StringData("sound"))
+
+    def stop(self):
+        print("stop")
+        self.unity_client.send_data(StringData("stop"))
+
+
     def _on_unity_connected(self):
         if self.on_status_change:
             self.on_status_change()
@@ -285,7 +347,7 @@ class UnityStepController:
 
     def on_receive(self, decodedData: DecodedData):
         if decodedData.get_name() == STRING_DATA_TYPE:
-            message = decodedData.get_data()
+            message:str = decodedData.get_data()
             if message == "end":
                 self.arduino_client.send("end")
                 self.__finished = True
@@ -304,6 +366,9 @@ class UnityStepController:
             elif message == "low":
                 if sutil.get_mode_number(sutil.get_mode(self.condition)) == 1:
                     self.arduino_client.send("low")
+            elif message.startswith("lapend"):
+                if self.on_lap_end:
+                    self.on_lap_end(int(message[6:]))
         else:
             print(f"Receive {decodedData.get_name()}")
 
@@ -328,31 +393,6 @@ class UnityStepController:
     @property
     def finished(self):
         return self.__finished
-
-
-class SoundPlayer:
-    def __init__(self, sound_path: Path):
-        self.sound_path = sound_path
-        self.play = False
-        self.wave_obj = sa.WaveObject.from_wave_file(str(sound_path))
-        self.play_obj: sa.PlayObject = None
-
-    def set_state(self, play: bool):
-        self.play = play
-        self.update()
-
-    def update(self):
-        if self.play:
-            if self.play_obj is not None and self.play_obj.is_playing():
-                # 再生中なら何もしない
-                return
-            else:
-                self.play_obj = self.wave_obj.play()
-        else:
-            if self.play_obj is not None:
-                self.play_obj.stop()
-                self.play_obj = None
-
 
 class PeriodicalSignalSender:
     def __init__(self, period: float, arduino_client: ArduinoSerial):
@@ -390,7 +430,6 @@ class UnityStep(Step):
         step_ui: UnityStepUI,
         controller: UnityStepController,
         save_ip_port: Callable[[str, int], None],
-        sound_player: SoundPlayer,
         periodicalSignalSender: PeriodicalSignalSender,
         container: ttk.Frame,
     ):
@@ -398,13 +437,13 @@ class UnityStep(Step):
         self.controller = controller
         self.set_complete = set_complete
         self.save_ip_port = save_ip_port
-        self.sound_player = sound_player
         self.container = container
         self.periodicalSignalSender = periodicalSignalSender
 
         self.controller.on_started = self._on_started
         self.controller.on_status_change = self._update_status
         self.controller.get_fms_value = self.ui.get_radio_values
+        self.controller.on_lap_end = self.ui.show_end_lap
         self.after_id = None
 
     def build(self):
@@ -413,7 +452,9 @@ class UnityStep(Step):
             on_connect_arduino=self._connect_arduino,
             on_start=self._start,
             on_reset_pose=self.controller.reset_pose,
+            on_sound_test=self.controller.sound_test,
             on_status_change=self._update_status,
+            on_stop=self.controller.stop,
         )
         self._update()
 
@@ -433,7 +474,6 @@ class UnityStep(Step):
 
     def _on_started(self):
         self.ui.show_started()
-        self.sound_player.set_state(True)
         self.periodicalSignalSender.start()
 
     def _update_status(self):
@@ -441,28 +481,24 @@ class UnityStep(Step):
         self.ui.set_unity_status(self.controller.unity_client.connected)
         self.ui.set_arduino_status(self.controller.arduino_client.connected)
         self.ui.set_reset_pose_button_enabled(self.controller.unity_client.connected)
-        self.ui.set_start_button_enabled(
-            self.controller.can_start() and self.ui.is_check_list_filled()
-        )
+        self.ui.set_sound_test_button_enabled(self.controller.unity_client.connected)
+        self.ui.set_start_button_enabled(self.controller.can_start() and self.ui.is_check_list_filled())
+        self.ui.set_stop_button_enabled(self.controller.unity_client.connected)
 
         if self.controller.finished:
             self.ui.show_finished()
-            self.sound_player.set_state(False)
             self.periodicalSignalSender.stop()
-            if self.ui.is_radio_fills():
-                self.set_complete(True)
+            self.set_complete(True)
 
     def on_dispose(self):
         self.controller.dispose()
-        self.sound_player.set_state(False)
         if self.after_id:
             self.container.after_cancel(self.after_id)
 
     def before_next(self):
-        pass
+        self.controller.save()
 
     def _update(self):
-        self.sound_player.update()
         self.after_id = self.container.after(30, self._update)
         self.periodicalSignalSender.update()
 
@@ -482,7 +518,7 @@ class UnityStepFactory:
 
     def create(self, frame: ttk.Frame, set_complete: Callable[[bool], None]) -> Step:
         condition = self.data_container["condition"]
-        ip = self.data_container.get("ip", "192.168.30.12")
+        ip = self.data_container.get("ip", "192.168.30.15")
         port = self.data_container.get("port", 51234)
         mode = sutil.get_mode(condition)
         position = sutil.get_position(condition)
@@ -497,6 +533,7 @@ class UnityStepFactory:
         unity_client = TCPClient(decoder)
 
         arduino_client = ArduinoSerial(port="COM3")
+#        arduino_client = ArduinoSerialMock()
 
         save_dir = sutil.get_save_dir_from_container(
             self.working_dir, self.data_container
@@ -505,7 +542,6 @@ class UnityStepFactory:
         saver = DataSaver(save_dir, file_name)
 
         controller = UnityStepController(unity_client, arduino_client, saver, condition)
-        sound_player = SoundPlayer(self.sound_path)
         if sutil.get_mode_number(mode) == 3:
             periodical = PeriodicalSignalSender(5, arduino_client)
         else:
@@ -516,7 +552,6 @@ class UnityStepFactory:
             ui,
             controller,
             self.save_ip_port,
-            sound_player,
             periodical,
             frame,
         )

@@ -72,7 +72,7 @@ def main(working_dir: Path, bb_dir: Path, sound_path: Path):
         mssq_factory.create,
         before_ssq_factory.create,
         unity_step_factory.create,
-        vection_survey_step_factory.create,
+        #vection_survey_step_factory.create,
         after_ssq_factory.create,
         file_move_step_factory.create,
     ]
