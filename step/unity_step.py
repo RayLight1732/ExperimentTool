@@ -65,6 +65,7 @@ class UnityStepUI:
         self.fms_container = ttk.Frame(self.container)
         self.radio_vars: list[tk.IntVar] = []
         self.lap_count = lap_count
+        self.arduino_testing = False
 
     def build(
         self,
@@ -74,7 +75,8 @@ class UnityStepUI:
         on_reset_pose,
         on_sound_test,
         on_status_change,
-        on_stop
+        on_stop,
+        on_arduino_test:Callable[[bool],None],
     ):
         self.container.columnconfigure(0, weight=2)
         self.container.columnconfigure(1, weight=1)
@@ -90,7 +92,6 @@ class UnityStepUI:
         ttk.Label(self.controller_container, text="IPアドレス").pack(side="top")
 
         self.ip_var = tk.StringVar()
-        self.ip_var.trace_add("write", self._validate_ip_port)
         self.ip_entry = ttk.Entry(self.controller_container, textvariable=self.ip_var)
 
         self.ip_entry.pack(pady=(0, 10), side="top")
@@ -100,7 +101,6 @@ class UnityStepUI:
         vcmd = (self.controller_container.register(self._validate_port_entry), "%P")
 
         self.port_var = tk.StringVar()
-        self.port_var.trace_add("write", self._validate_ip_port)
         self.port_entry = ttk.Entry(
             self.controller_container,
             textvariable=self.port_var,
@@ -118,6 +118,10 @@ class UnityStepUI:
             command=on_connect_unity
         )
         self.connect_button.pack(side="top")
+
+        
+        self.ip_var.trace_add("write", self._validate_ip_port)
+        self.port_var.trace_add("write", self._validate_ip_port)
 
         self.arduino_connect_button = ttk.Button(
             self.controller_container, text="Arduinoに接続", command=on_connect_arduino
@@ -139,6 +143,11 @@ class UnityStepUI:
             command=on_sound_test,
         )
         self.sound_test_button.pack(side="top")
+
+        self.arduino_test_button = ttk.Button(
+            self.controller_container,text="Arduinoテスト開始",state="disabled",command=lambda: self.on_arduino_test_button_press(on_arduino_test)
+        )
+        self.arduino_test_button.pack(side="top")
 
         self.start_button = ttk.Button(
             self.controller_container, text="開始", state="disabled", command=on_start
@@ -236,6 +245,21 @@ class UnityStepUI:
         if self.reset_pose_button.winfo_exists():
             self.reset_pose_button["state"] = "normal" if enabled else "disabled"
 
+    def on_arduino_test_button_press(self,on_arduino_test:Callable[[bool],None]):
+        self.set_arduino_testing(not self.arduino_testing)
+        on_arduino_test(self.arduino_testing)
+
+    
+    def set_arduino_test_button_enabled(self,enabled:bool):
+        if self.arduino_test_button.winfo_exists():
+            self.arduino_test_button["state"] = "normal" if enabled else "disabled"
+
+    def set_arduino_testing(self,testing:bool):
+        self.arduino_testing = testing
+        if self.arduino_test_button.winfo_exists():
+            text = "Arduinoテスト中" if testing else "Arduinoテスト開始"
+            self.arduino_test_button.config(text=text)
+
     def set_sound_test_button_enabled(self, enabled: bool):
         if self.sound_test_button.winfo_exists():
              self.sound_test_button["state"] = "normal" if enabled else "disabled"
@@ -253,7 +277,8 @@ class UnityStepUI:
         if self.started_text:
             self.started_text.destroy()
         if self.finished_text is None:
-            self.finished_text = tk.Label(self.controller_container, text="終了しました").pack(pady=20)
+            self.finished_text = tk.Label(self.controller_container, text="終了しました")
+            self.finished_text.pack(pady=20)
             show_non_blocking("info","実験終了")
 
     def show_end_lap(self,lap):
@@ -354,18 +379,18 @@ class UnityStepController:
                 if self.on_status_change:
                     self.on_status_change()
             elif message == "started":
-                self.arduino_client.send(f"mode{self.condition}")
+                self.send_arduino_mode()
                 self.arduino_client.send("start")
                 if sutil.get_mode_number(sutil.get_mode(self.condition)) == 2:
-                    self.arduino_client.send("high")
+                    self.set_arduino_voltage(True)
                 if self.on_started:
                     self.on_started()
             elif message == "high":
                 if sutil.get_mode_number(sutil.get_mode(self.condition)) == 1:
-                    self.arduino_client.send("high")
+                    self.set_arduino_voltage(True)
             elif message == "low":
                 if sutil.get_mode_number(sutil.get_mode(self.condition)) == 1:
-                    self.arduino_client.send("low")
+                    self.set_arduino_voltage(False)
             elif message.startswith("lapend"):
                 if self.on_lap_end:
                     self.on_lap_end(int(message[6:]))
@@ -389,6 +414,15 @@ class UnityStepController:
 
     def save(self):
         self.saver.save_csv(self.get_fms_value())
+
+    def set_arduino_voltage(self,high:bool):
+        if high:
+            self.arduino_client.send("high")
+        else:
+            self.arduino_client.send("low")
+    
+    def send_arduino_mode(self):
+        self.arduino_client.send(f"mode{self.condition}")
 
     @property
     def finished(self):
@@ -455,8 +489,14 @@ class UnityStep(Step):
             on_sound_test=self.controller.sound_test,
             on_status_change=self._update_status,
             on_stop=self.controller.stop,
+            on_arduino_test=self._on_arduino_test
         )
         self._update()
+    
+    def _on_arduino_test(self,high:bool):
+        if high:
+            self.controller.send_arduino_mode()
+        self.controller.set_arduino_voltage(high)
 
     def _connect_unity(self):
         ip = self.ui.get_ip()
@@ -480,6 +520,7 @@ class UnityStep(Step):
         print("update status")
         self.ui.set_unity_status(self.controller.unity_client.connected)
         self.ui.set_arduino_status(self.controller.arduino_client.connected)
+        self.ui.set_arduino_test_button_enabled(self.controller.arduino_client.connected)
         self.ui.set_reset_pose_button_enabled(self.controller.unity_client.connected)
         self.ui.set_sound_test_button_enabled(self.controller.unity_client.connected)
         self.ui.set_start_button_enabled(self.controller.can_start() and self.ui.is_check_list_filled())
@@ -518,7 +559,7 @@ class UnityStepFactory:
 
     def create(self, frame: ttk.Frame, set_complete: Callable[[bool], None]) -> Step:
         condition = self.data_container["condition"]
-        ip = self.data_container.get("ip", "192.168.30.15")
+        ip = self.data_container.get("ip", "192.168.30.11")
         port = self.data_container.get("port", 51234)
         mode = sutil.get_mode(condition)
         position = sutil.get_position(condition)
